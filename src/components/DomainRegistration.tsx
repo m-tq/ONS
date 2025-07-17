@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { useONS } from '../contexts/ONSContext';
 import { useWallet } from '../contexts/WalletContext';
 import { useToast } from '../hooks/use-toast';
 import { isValidDomain } from '../lib/utils';
-import { Search, CheckCircle, XCircle, ExternalLink, Loader2, Send } from 'lucide-react';
+import { Search, CheckCircle, XCircle, ExternalLink, Loader2, Send, AlertTriangle } from 'lucide-react';
 import { octraRpc } from '../services/octraRpc';
 
 export function DomainRegistration() {
@@ -127,145 +128,160 @@ export function DomainRegistration() {
   const hasInsufficientBalance = walletBalance && parseFloat(walletBalance.balance) < 0.5;
 
   return (
-    <Card className="soft-card">
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Search className="h-5 w-5" />
-          <span>Register Domain</span>
-        </CardTitle>
-        <CardDescription>
-          Register your Octra address as a human-readable domain name
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Balance Warning */}
-        {hasInsufficientBalance && (
-          <div className="p-4 bg-yellow-50/80 dark:bg-yellow-900/20 border border-yellow-200/60 dark:border-yellow-800/60 rounded-lg backdrop-blur-sm">
-            <div className="flex items-center space-x-2 text-yellow-700 dark:text-yellow-300">
-              <XCircle className="h-5 w-5" />
-              <span className="font-medium">Insufficient Balance</span>
-            </div>
-            <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
-              You need at least 0.5 OCT to register a domain. Current balance: {walletBalance?.balance} OCT
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-2"
-              onClick={() => window.open(octraRpc.getFaucetUrl(), '_blank')}
-            >
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Get OCT from Faucet
-            </Button>
-          </div>
-        )}
-
-        {/* Domain Search */}
-        <div className="space-y-4">
-          <div className="flex space-x-2">
-            <div className="flex-1 relative">
-              <Input
-                placeholder="Enter domain name (without .oct)"
-                value={domain}
-                onChange={(e) => {
-                  setDomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
-                  setIsAvailable(null);
-                }}
-                className="pr-12"
-              />
-              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500 dark:text-slate-400">
-                .oct
-              </span>
-            </div>
-            <Button 
-              onClick={handleCheckAvailability}
-              disabled={isChecking || !domain.trim()}
-              variant="outline"
-            >
-              {isChecking ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
-
-          {/* Availability Status */}
-          {isAvailable !== null && (
-            <div className={`p-3 rounded-lg flex items-center space-x-2 backdrop-blur-sm ${
-              isAvailable 
-                ? 'bg-green-50/80 dark:bg-green-900/20 border border-green-200/60 dark:border-green-800/60' 
-                : 'bg-red-50/80 dark:bg-red-900/20 border border-red-200/60 dark:border-red-800/60'
-            }`}>
-              {isAvailable ? (
-                <>
-                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  <span className="text-green-700 dark:text-green-300 font-medium">
-                    {domain}.oct is available!
-                  </span>
-                </>
-              ) : (
-                <>
-                  <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
-                  <span className="text-red-700 dark:text-red-300 font-medium">
-                    {domain}.oct is already taken
-                  </span>
-                </>
-              )}
-            </div>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Search className="h-5 w-5" />
+            <span>Register Domain</span>
+          </CardTitle>
+          <CardDescription>
+            Register your Octra address as a human-readable domain name for 0.5 OCT
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Balance Warning */}
+          {hasInsufficientBalance && (
+            <Card className="border-destructive/50 bg-destructive/5">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2 text-destructive">
+                  <AlertTriangle className="h-5 w-5" />
+                  <span className="font-medium">Insufficient Balance</span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  You need at least 0.5 OCT to register a domain. Current balance: {walletBalance?.balance} OCT
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => window.open(octraRpc.getFaucetUrl(), '_blank')}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Get OCT from Faucet
+                </Button>
+              </CardContent>
+            </Card>
           )}
-        </div>
 
-        {/* Registration Form */}
-        {isAvailable && wallet.isConnected && (
-          <div className="space-y-4 p-4 bg-blue-50/80 dark:bg-blue-900/20 border border-blue-200/60 dark:border-blue-800/60 rounded-lg backdrop-blur-sm">
-            <h4 className="font-medium text-blue-900 dark:text-blue-100">
-              Register Domain
-            </h4>
-            
+          {/* Domain Search */}
+          <div className="space-y-4">
             <div className="space-y-2">
-              <p className="text-sm text-blue-700 dark:text-blue-300">
-                Registration fee: <strong>0.5 OCT</strong>
-              </p>
-              <p className="text-sm text-blue-700 dark:text-blue-300">
-                Domain: <strong>{domain}.oct</strong>
-              </p>
-              <p className="text-sm text-blue-700 dark:text-blue-300">
-                Will be registered to: <code className="px-2 py-1 bg-blue-100 dark:bg-blue-800 rounded text-xs">
-                  {wallet.address}
-                </code>
-              </p>
+              <Label htmlFor="domain">Domain Name</Label>
+              <div className="flex space-x-2">
+                <div className="flex-1 relative">
+                  <Input
+                    id="domain"
+                    placeholder="Enter domain name"
+                    value={domain}
+                    onChange={(e) => {
+                      setDomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+                      setIsAvailable(null);
+                    }}
+                    className="pr-12"
+                  />
+                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                    .oct
+                  </span>
+                </div>
+                <Button 
+                  onClick={handleCheckAvailability}
+                  disabled={isChecking || !domain.trim()}
+                  variant="outline"
+                >
+                  {isChecking ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </div>
 
-            <Button 
-              onClick={handleRegisterWithWallet}
-              disabled={isRegistering || hasInsufficientBalance}
-              className="w-full"
-            >
-              {isRegistering ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Register Domain (0.5 OCT)
-                </>
-              )}
-            </Button>
+            {/* Availability Status */}
+            {isAvailable !== null && (
+              <Card className={isAvailable ? 'border-green-500/50 bg-green-50/50 dark:bg-green-950/50' : 'border-red-500/50 bg-red-50/50 dark:bg-red-950/50'}>
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    {isAvailable ? (
+                      <>
+                        <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        <span className="font-medium text-green-700 dark:text-green-300">
+                          {domain}.oct is available!
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                        <span className="font-medium text-red-700 dark:text-red-300">
+                          {domain}.oct is already taken
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
-        )}
 
-        {/* Connect Wallet Prompt */}
-        {isAvailable && !wallet.isConnected && (
-          <div className="p-4 bg-slate-50/80 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 rounded-lg backdrop-blur-sm">
-            <p className="text-slate-700 dark:text-slate-300 text-center">
-              Please connect your wallet to register this domain
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          {/* Registration Form */}
+          {isAvailable && wallet.isConnected && (
+            <Card className="border-primary/50 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="text-lg">Complete Registration</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <Label className="text-muted-foreground">Domain</Label>
+                    <p className="font-medium">{domain}.oct</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Registration Fee</Label>
+                    <p className="font-medium">0.5 OCT</p>
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-muted-foreground">Will be registered to</Label>
+                    <p className="font-mono text-xs bg-muted p-2 rounded mt-1">
+                      {wallet.address}
+                    </p>
+                  </div>
+                </div>
+
+                <Button 
+                  onClick={handleRegisterWithWallet}
+                  disabled={isRegistering || hasInsufficientBalance}
+                  className="w-full"
+                  size="lg"
+                >
+                  {isRegistering ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processing Registration...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Register Domain (0.5 OCT)
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Connect Wallet Prompt */}
+          {isAvailable && !wallet.isConnected && (
+            <Card className="border-muted">
+              <CardContent className="p-6 text-center">
+                <p className="text-muted-foreground">
+                  Please connect your wallet to register this domain
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

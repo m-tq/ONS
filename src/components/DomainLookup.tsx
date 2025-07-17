@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { useONS } from '../contexts/ONSContext';
 import { useToast } from '../hooks/use-toast';
@@ -95,61 +96,68 @@ export function DomainLookup() {
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Search Form */}
-        <div className="flex space-x-2">
-          <div className="flex-1 relative">
-            <Input
-              placeholder="Enter domain name (without .oct)"
-              value={searchDomain}
-              onChange={(e) => {
-                setSearchDomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
-                setSearchResult(null);
-                setNotFound(false);
-              }}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              className="pr-12"
-            />
-            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-              .oct
-            </span>
+        <div className="space-y-2">
+          <Label htmlFor="search">Domain Name</Label>
+          <div className="flex space-x-2">
+            <div className="flex-1 relative">
+              <Input
+                id="search"
+                placeholder="Enter domain name"
+                value={searchDomain}
+                onChange={(e) => {
+                  setSearchDomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''));
+                  setSearchResult(null);
+                  setNotFound(false);
+                }}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                className="pr-12"
+              />
+              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                .oct
+              </span>
+            </div>
+            <Button 
+              onClick={handleSearch}
+              disabled={isSearching || !searchDomain.trim()}
+            >
+              {isSearching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
+            </Button>
           </div>
-          <Button 
-            onClick={handleSearch}
-            disabled={isSearching || !searchDomain.trim()}
-          >
-            {isSearching ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Search className="h-4 w-4" />
-            )}
-          </Button>
         </div>
 
         {/* Search Results */}
         {searchResult && (
-          <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-            <div className="flex items-center space-x-2 mb-3">
-              <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-              <h4 className="font-medium text-green-900 dark:text-green-100">
-                Domain Found
-              </h4>
-            </div>
-            
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-green-700 dark:text-green-300 mb-1">
-                  Domain
-                </label>
-                <div className="p-2 bg-green-100 dark:bg-green-800 rounded font-mono text-sm">
-                  {searchResult.domain}.oct
+          <Card className="border-green-500/50 bg-green-50/50 dark:bg-green-950/50">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2 text-green-700 dark:text-green-300">
+                <CheckCircle className="h-5 w-5" />
+                <span>Domain Found</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground">Domain</Label>
+                  <p className="font-mono bg-background p-2 rounded mt-1">
+                    {searchResult.domain}.oct
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Registered</Label>
+                  <p className="font-medium mt-1">
+                    {new Date(searchResult.created_at).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-green-700 dark:text-green-300 mb-1">
-                  Resolves to
-                </label>
-                <div className="flex items-center space-x-2">
-                  <div className="flex-1 p-2 bg-green-100 dark:bg-green-800 rounded font-mono text-sm break-all">
+                <Label className="text-muted-foreground">Resolves to</Label>
+                <div className="flex items-center space-x-2 mt-1">
+                  <div className="flex-1 font-mono bg-background p-2 rounded text-sm break-all">
                     {searchResult.address}
                   </div>
                   <Button
@@ -166,35 +174,35 @@ export function DomainLookup() {
                 </div>
               </div>
               
-              <div className="flex items-center justify-between text-sm text-green-600 dark:text-green-400">
-                <span>Registered: {new Date(searchResult.created_at).toLocaleDateString()}</span>
+              <div className="flex justify-end">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => openTransaction(searchResult.tx_hash)}
-                  className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300"
                 >
-                  <ExternalLink className="h-4 w-4 mr-1" />
+                  <ExternalLink className="h-4 w-4 mr-2" />
                   View Transaction
                 </Button>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Not Found */}
         {notFound && (
-          <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <div className="flex items-center space-x-2">
-              <Search className="h-5 w-5 text-red-600 dark:text-red-400" />
-              <span className="text-red-700 dark:text-red-300 font-medium">
-                Domain "{searchDomain}.oct" is not registered
-              </span>
-            </div>
-            <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-              This domain is available for registration
-            </p>
-          </div>
+          <Card className="border-red-500/50 bg-red-50/50 dark:bg-red-950/50">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-2 text-red-700 dark:text-red-300">
+                <Search className="h-5 w-5" />
+                <span className="font-medium">
+                  Domain "{searchDomain}.oct" is not registered
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                This domain is available for registration
+              </p>
+            </CardContent>
+          </Card>
         )}
       </CardContent>
     </Card>

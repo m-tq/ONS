@@ -4,48 +4,48 @@
 
 @layer base {
   :root {
-    --background: 248 250 252;
-    --foreground: 51 65 85;
-    --card: 255 255 255;
-    --card-foreground: 51 65 85;
-    --popover: 255 255 255;
-    --popover-foreground: 51 65 85;
-    --primary: 59 130 246;
-    --primary-foreground: 255 255 255;
-    --secondary: 241 245 249;
-    --secondary-foreground: 71 85 105;
-    --muted: 248 250 252;
-    --muted-foreground: 100 116 139;
-    --accent: 241 245 249;
-    --accent-foreground: 71 85 105;
-    --destructive: 239 68 68;
-    --destructive-foreground: 255 255 255;
-    --border: 226 232 240;
-    --input: 226 232 240;
-    --ring: 59 130 246;
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
     --radius: 0.75rem;
   }
 
   .dark {
-    --background: 15 23 42;
-    --foreground: 226 232 240;
-    --card: 30 41 59;
-    --card-foreground: 226 232 240;
-    --popover: 30 41 59;
-    --popover-foreground: 226 232 240;
-    --primary: 59 130 246;
-    --primary-foreground: 255 255 255;
-    --secondary: 51 65 85;
-    --secondary-foreground: 203 213 225;
-    --muted: 51 65 85;
-    --muted-foreground: 148 163 184;
-    --accent: 51 65 85;
-    --accent-foreground: 203 213 225;
-    --destructive: 239 68 68;
-    --destructive-foreground: 255 255 255;
-    --border: 51 65 85;
-    --input: 51 65 85;
-    --ring: 59 130 246;
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
   }
 }
 
@@ -54,31 +54,54 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground;
   }
 }
 
-/* Custom styles for softer appearance */
-.soft-card {
-  @apply bg-white/80 backdrop-blur-sm border border-slate-200/60 shadow-sm;
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
 }
 
-.dark .soft-card {
-  @apply bg-slate-800/80 border-slate-700/60;
+::-webkit-scrollbar-track {
+  @apply bg-muted;
 }
 
-.soft-button {
-  @apply bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-all duration-200;
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/30 rounded-full;
 }
 
-.dark .soft-button {
-  @apply bg-blue-900/30 hover:bg-blue-900/50 text-blue-300 border-blue-800/50;
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/50;
 }
 
-.gradient-bg {
-  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+/* Smooth transitions */
+* {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
 }
 
-.dark .gradient-bg {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+/* Focus styles */
+.focus-visible {
+  @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+}
+
+/* Animation keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
 }
