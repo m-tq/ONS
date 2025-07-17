@@ -17,10 +17,10 @@ export function ONSInterface() {
     <div className="space-y-6">
       {/* Wallet Status */}
       {wallet.isConnected && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+        <div className="bg-gradient-to-r from-blue-50/80 to-indigo-50/80 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200/60 dark:border-blue-800/60 rounded-xl p-4 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
                 <Wallet className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
@@ -46,7 +46,7 @@ export function ONSInterface() {
 
       {/* Main Interface */}
       <Tabs defaultValue="register" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-4 bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-sm">
           <TabsTrigger value="register">Register</TabsTrigger>
           <TabsTrigger value="lookup">Lookup</TabsTrigger>
           <TabsTrigger value="domains">My Domains</TabsTrigger>

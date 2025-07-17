@@ -11,6 +11,7 @@ interface WalletContextType {
   connectWallet: () => void;
   disconnectWallet: () => void;
   isConnecting: boolean;
+  sendTransaction: (to: string, amount: string, message?: string) => Promise<string | null>;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -86,7 +87,6 @@ export function WalletProvider({ children }: WalletProviderProps) {
     const walletUrl = 'http://localhost:5173'; // Ganti dengan URL wallet Anda
     // const walletUrl = 'https://octra.xme.my.id'; // Ganti dengan URL wallet Anda
     
-    // 
     // URL callback untuk DApp ini
     const currentUrl = window.location.origin + window.location.pathname;
     const successUrl = currentUrl;
@@ -97,11 +97,84 @@ export function WalletProvider({ children }: WalletProviderProps) {
       success_url: successUrl,
       failure_url: failureUrl,
       origin: window.location.origin,
-      app_name: 'Octra DApp Example'
+      app_name: 'ONS - Octra Name Service'
     });
 
     // Redirect ke wallet untuk connection
     window.location.href = `${walletUrl}?${params.toString()}`;
+  };
+
+  const sendTransaction = async (to: string, amount: string, message?: string): Promise<string | null> => {
+    if (!wallet.isConnected) {
+      throw new Error('Wallet not connected');
+    }
+
+    try {
+      // URL wallet Octra
+      const walletUrl = 'http://localhost:5173'; // Ganti dengan URL wallet Anda
+      
+      // URL callback untuk DApp ini
+      const currentUrl = window.location.origin + window.location.pathname;
+      const successUrl = currentUrl + '?tx_success=true';
+      const failureUrl = currentUrl + '?tx_error=true';
+      
+      // Parameter untuk transaction request
+      const params = new URLSearchParams({
+        action: 'send',
+        to: to,
+        amount: amount,
+        success_url: successUrl,
+        failure_url: failureUrl,
+        origin: window.location.origin,
+        app_name: 'ONS - Octra Name Service'
+      });
+
+      // Tambahkan message jika ada
+      if (message) {
+        params.append('message', message);
+      }
+
+      // Redirect ke wallet untuk transaction
+      window.location.href = `${walletUrl}?${params.toString()}`;
+      
+      // Return promise yang akan di-resolve setelah redirect kembali
+      return new Promise((resolve, reject) => {
+        // Set timeout untuk menghindari hanging promise
+        const timeout = setTimeout(() => {
+          reject(new Error('Transaction timeout'));
+        }, 300000); // 5 menit timeout
+
+        // Check for transaction result in URL params
+        const checkResult = () => {
+          const urlParams = new URLSearchParams(window.location.search);
+          const txSuccess = urlParams.get('tx_success');
+          const txError = urlParams.get('tx_error');
+          const txHash = urlParams.get('tx_hash');
+
+          if (txSuccess === 'true' && txHash) {
+            clearTimeout(timeout);
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            resolve(txHash);
+          } else if (txError === 'true') {
+            clearTimeout(timeout);
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            reject(new Error('Transaction failed'));
+          }
+        };
+
+        // Check immediately and then periodically
+        checkResult();
+        const interval = setInterval(checkResult, 1000);
+        
+        // Clear interval when promise resolves/rejects
+        setTimeout(() => clearInterval(interval), 300000);
+      });
+    } catch (error) {
+      console.error('Error sending transaction:', error);
+      return null;
+    }
   };
 
   const disconnectWallet = () => {
@@ -118,7 +191,8 @@ export function WalletProvider({ children }: WalletProviderProps) {
       wallet,
       connectWallet,
       disconnectWallet,
-      isConnecting
+      isConnecting,
+      sendTransaction
     }}>
       {children}
     </WalletContext.Provider>

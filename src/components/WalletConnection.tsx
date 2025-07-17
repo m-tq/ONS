@@ -1,6 +1,7 @@
 import React from 'react';
 import { useWallet } from '../contexts/WalletContext';
 import { Wallet, LogOut, Loader2 } from 'lucide-react';
+import { Button } from './ui/button';
 
 export function WalletConnection() {
   const { wallet, connectWallet, disconnectWallet, isConnecting } = useWallet();
@@ -11,62 +12,64 @@ export function WalletConnection() {
 
   if (wallet.isConnected) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
+      <div className="soft-card rounded-xl p-6 mb-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <div className="p-3 bg-green-100 dark:bg-green-900 rounded-full">
+            <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
               <Wallet className="h-6 w-6 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
                 Wallet Connected
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300 font-mono">
+              <p className="text-sm text-slate-600 dark:text-slate-400 font-mono">
                 {truncateAddress(wallet.address!)}
               </p>
             </div>
           </div>
-          <button
+          <Button
+            variant="outline"
             onClick={disconnectWallet}
-            className="flex items-center space-x-2 px-4 py-2 bg-red-100 hover:bg-red-200 dark:bg-red-900 dark:hover:bg-red-800 text-red-700 dark:text-red-300 rounded-lg transition-colors"
+            className="text-red-600 border-red-200 hover:bg-red-50 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/20"
           >
-            <LogOut className="h-4 w-4" />
-            <span>Disconnect</span>
-          </button>
+            <LogOut className="h-4 w-4 mr-2" />
+            Disconnect
+          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-8">
+    <div className="soft-card rounded-xl p-8 mb-8">
       <div className="text-center">
-        <div className="p-4 bg-blue-100 dark:bg-blue-900 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+        <div className="p-4 bg-blue-100 dark:bg-blue-900/30 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
           <Wallet className="h-8 w-8 text-blue-600 dark:text-blue-400" />
         </div>
-        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+        <h3 className="text-xl font-semibold text-slate-800 dark:text-slate-100 mb-2">
           Connect Your Octra Wallet
         </h3>
-        <p className="text-gray-600 dark:text-gray-300 mb-6">
+        <p className="text-slate-600 dark:text-slate-400 mb-6">
           Connect your Octra Web Wallet to interact with this DApp
         </p>
-        <button
+        <Button
           onClick={connectWallet}
           disabled={isConnecting}
-          className="inline-flex items-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors font-medium"
+          size="lg"
+          className="px-8"
         >
           {isConnecting ? (
             <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span>Connecting...</span>
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+              Connecting...
             </>
           ) : (
             <>
-              <Wallet className="h-5 w-5" />
-              <span>Connect Wallet</span>
+              <Wallet className="h-5 w-5 mr-2" />
+              Connect Wallet
             </>
           )}
-        </button>
+        </Button>
       </div>
     </div>
   );
