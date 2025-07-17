@@ -62,9 +62,11 @@ export function Header() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <div className="flex items-center space-x-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
-              O
-            </div>
+            <img 
+              src="https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=32&h=32&fit=crop" 
+              alt="ONS Logo" 
+              className="h-8 w-8 rounded-lg object-cover"
+            />
             <span className="text-xl font-bold">ONS</span>
             <span className="text-sm text-muted-foreground hidden sm:inline">
               Octra Name Service

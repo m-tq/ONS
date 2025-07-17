@@ -23,7 +23,7 @@ interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [theme, setThemeState] = useState<Theme>('light');
+  const [theme, setThemeState] = useState<Theme>('dark');
 
   useEffect(() => {
     // Check for saved theme preference or default to light
@@ -31,9 +31,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     if (savedTheme) {
       setThemeState(savedTheme);
     } else {
-      // Check system preference
-      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setThemeState(systemPrefersDark ? 'dark' : 'light');
+      // Default to dark theme
+      setThemeState('dark');
     }
   }, []);
 
