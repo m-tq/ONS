@@ -85,7 +85,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
     
     // URL wallet Octra Anda - sesuaikan dengan URL deployment wallet
     const walletUrl = 'http://localhost:5173'; // Ganti dengan URL wallet Anda
-    // const walletUrl = 'https://octra.xme.my.id'; // Ganti dengan URL wallet Anda
+    // const walletUrl = 'https://oct.xme.my.id'; // Ganti dengan URL wallet Anda
     
     // URL callback untuk DApp ini
     const currentUrl = window.location.origin + window.location.pathname;

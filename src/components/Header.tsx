@@ -52,7 +52,7 @@ export function Header() {
 
   const openExplorer = () => {
     if (wallet.address) {
-      window.open(`https://octra.network/address/${wallet.address}`, '_blank');
+      window.open(`https://octrascan.io/addr/${wallet.address}`, '_blank');
     }
   };
 
@@ -63,7 +63,7 @@ export function Header() {
           {/* Logo */}
           <div className="flex items-center space-x-2">
             <img 
-              src="https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=32&h=32&fit=crop" 
+              src="https://octra.org/favicon.ico" 
               alt="ONS Logo" 
               className="h-8 w-8 rounded-lg object-cover"
             />
