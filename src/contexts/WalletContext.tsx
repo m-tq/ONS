@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useONS } from './ONSContext';
 
 interface WalletState {
   isConnected: boolean;
@@ -8,10 +9,11 @@ interface WalletState {
 
 interface WalletContextType {
   wallet: WalletState;
-  connectWallet: () => void;
+  connectWallet: (providerUrl?: string) => void;
   disconnectWallet: () => void;
   isConnecting: boolean;
   sendTransaction: (to: string, amount: string, message?: string) => Promise<string | null>;
+  handleTransactionSuccess: (txHash: string) => Promise<void>;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -29,6 +31,7 @@ interface WalletProviderProps {
 }
 
 export function WalletProvider({ children }: WalletProviderProps) {
+  const onsContext = useONS();
   const [wallet, setWallet] = useState<WalletState>({
     isConnected: false,
     address: null,
@@ -38,6 +41,42 @@ export function WalletProvider({ children }: WalletProviderProps) {
 
   // Check for existing connection on load
   useEffect(() => {
+    const handleUrlParams = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const txSuccess = urlParams.get('tx_success');
+      const txHash = urlParams.get('tx_hash');
+      const accountId = urlParams.get('account_id');
+      const publicKey = urlParams.get('public_key');
+
+      // Handle wallet connection callback
+      if (accountId && publicKey) {
+        const walletData = {
+          address: accountId,
+          publicKey: publicKey,
+        };
+
+        setWallet({
+          isConnected: true,
+          address: accountId,
+          publicKey: publicKey,
+        });
+
+        // Save to localStorage
+        localStorage.setItem('octra-dapp-wallet', JSON.stringify(walletData));
+        setIsConnecting(false);
+      }
+
+      // Handle transaction success
+      if (txSuccess === 'true' && txHash) {
+        await handleTransactionSuccess(txHash);
+      }
+
+      // Clean up URL if there are any params
+      if (urlParams.toString()) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    };
+
     const savedWallet = localStorage.getItem('octra-dapp-wallet');
     if (savedWallet) {
       try {
@@ -53,39 +92,27 @@ export function WalletProvider({ children }: WalletProviderProps) {
       }
     }
 
-    // Handle wallet connection callback
-    const urlParams = new URLSearchParams(window.location.search);
-    const accountId = urlParams.get('account_id');
-    const publicKey = urlParams.get('public_key');
-
-    if (accountId && publicKey) {
-      const walletData = {
-        address: accountId,
-        publicKey: publicKey,
-      };
-
-      setWallet({
-        isConnected: true,
-        address: accountId,
-        publicKey: publicKey,
-      });
-
-      // Save to localStorage
-      localStorage.setItem('octra-dapp-wallet', JSON.stringify(walletData));
-
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-      
-      setIsConnecting(false);
-    }
+    handleUrlParams();
   }, []);
 
-  const connectWallet = () => {
+  const handleTransactionSuccess = async (txHash: string) => {
+    if (!onsContext) return;
+    
+    try {
+      // Verify and process the transaction
+      await onsContext.verifyAndProcessTransaction(txHash);
+    } catch (error) {
+      console.error('Error handling transaction success:', error);
+    }
+  };
+
+  const connectWallet = (providerUrl?: string) => {
     setIsConnecting(true);
     
-    // URL wallet Octra Anda - sesuaikan dengan URL deployment wallet
-    const walletUrl = 'http://localhost:5173'; // Ganti dengan URL wallet Anda
-    // const walletUrl = 'https://oct.xme.my.id'; // Ganti dengan URL wallet Anda
+    // Use provided URL or default from environment
+    const defaultProviders = import.meta.env.VITE_WALLET_PROVIDERS || 'localhost:5173';
+    const firstProvider = defaultProviders.split(',')[0].trim();
+    const walletUrl = providerUrl || (firstProvider.startsWith('http') ? firstProvider : `https://${firstProvider}`);
     
     // URL callback untuk DApp ini
     const currentUrl = window.location.origin + window.location.pathname;
@@ -97,7 +124,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
       success_url: successUrl,
       failure_url: failureUrl,
       origin: window.location.origin,
-      app_name: 'ONS - Octra Name Service'
+      app_name: import.meta.env.VITE_APP_NAME || 'ONS - Octra Name Service'
     });
 
     // Redirect ke wallet untuk connection
@@ -110,8 +137,10 @@ export function WalletProvider({ children }: WalletProviderProps) {
     }
 
     try {
-      // URL wallet Octra
-      const walletUrl = 'http://localhost:5173'; // Ganti dengan URL wallet Anda
+      // Use default wallet provider
+      const defaultProviders = import.meta.env.VITE_WALLET_PROVIDERS || 'localhost:5173';
+      const firstProvider = defaultProviders.split(',')[0].trim();
+      const walletUrl = firstProvider.startsWith('http') ? firstProvider : `https://${firstProvider}`;
       
       // URL callback untuk DApp ini
       const currentUrl = window.location.origin + window.location.pathname;
@@ -126,7 +155,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
         success_url: successUrl,
         failure_url: failureUrl,
         origin: window.location.origin,
-        app_name: 'ONS - Octra Name Service'
+        app_name: import.meta.env.VITE_APP_NAME || 'ONS - Octra Name Service'
       });
 
       // Tambahkan message jika ada
@@ -192,7 +221,8 @@ export function WalletProvider({ children }: WalletProviderProps) {
       connectWallet,
       disconnectWallet,
       isConnecting,
-      sendTransaction
+      sendTransaction,
+      handleTransactionSuccess
     }}>
       {children}
     </WalletContext.Provider>

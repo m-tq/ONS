@@ -22,8 +22,15 @@ export interface WalletBalance {
 }
 
 export class OctraRpcService {
-  private baseUrl = 'https://octra.network';
-  private masterWallet = 'oct8UYokvM1DR2QpTD4mncgvRzfM6f9yDuRR1gmBASgTk8d';
+  private baseUrl: string;
+  private masterWallet: string;
+  private faucetUrl: string;
+
+  constructor() {
+    this.baseUrl = import.meta.env.VITE_OCTRA_RPC_URL || 'http://localhost:5173/api/octra';
+    this.masterWallet = import.meta.env.VITE_MASTER_WALLET || 'oct8UYokvM1DR2QpTD4mncgvRzfM6f9yDuRR1gmBASgTk8d';
+    this.faucetUrl = import.meta.env.VITE_OCTRA_FAUCET_URL || 'https://oct-faucet.xme.my.id';
+  }
 
   async getTransaction(txHash: string): Promise<OctraTransaction | null> {
     try {
@@ -90,7 +97,7 @@ export class OctraRpcService {
   }
 
   getFaucetUrl(): string {
-    return 'https://oct-faucet.xme.my.id';
+    return this.faucetUrl;
   }
 }
 

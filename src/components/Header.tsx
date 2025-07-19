@@ -1,6 +1,8 @@
 import React from 'react';
+import { useState } from 'react';
 import { useWallet } from '../contexts/WalletContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { WalletProviderModal } from './WalletProviderModal';
 import { Button } from './ui/button';
 import { Switch } from './ui/switch';
 import { Label } from './ui/label';
@@ -31,6 +33,7 @@ export function Header() {
   const { wallet, connectWallet, disconnectWallet, isConnecting } = useWallet();
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
+  const [showWalletModal, setShowWalletModal] = useState(false);
 
   const copyAddress = async () => {
     if (wallet.address) {
@@ -56,8 +59,17 @@ export function Header() {
     }
   };
 
+  const handleConnectWallet = () => {
+    setShowWalletModal(true);
+  };
+
+  const handleSelectProvider = (providerUrl: string) => {
+    connectWallet(providerUrl);
+  };
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <>
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
@@ -91,7 +103,7 @@ export function Header() {
             {/* Wallet Connection */}
             {wallet.isConnected ? (
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+                <DropdownMenuTrigger asChild className="focus:outline-none">
                   <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                     <Avatar className="h-10 w-10">
                       <AvatarFallback className="bg-primary text-primary-foreground">
@@ -127,7 +139,7 @@ export function Header() {
               </DropdownMenu>
             ) : (
               <Button
-                onClick={connectWallet}
+                onClick={handleConnectWallet}
                 disabled={isConnecting}
                 variant="default"
                 size="sm"
@@ -148,6 +160,13 @@ export function Header() {
           </div>
         </div>
       </div>
-    </header>
+      </header>
+      
+      <WalletProviderModal
+        isOpen={showWalletModal}
+        onClose={() => setShowWalletModal(false)}
+        onSelectProvider={handleSelectProvider}
+      />
+    </>
   );
 }

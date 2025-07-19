@@ -14,7 +14,11 @@ export interface DomainStats {
 }
 
 export class ResolverApiService {
-  private baseUrl = 'http://localhost:3001/api'; // Update with your resolver API URL
+  private baseUrl: string;
+
+  constructor() {
+    this.baseUrl = import.meta.env.VITE_RESOLVER_API_URL || 'http://localhost:3001/api';
+  }
 
   async registerDomain(domain: string, address: string, txHash: string): Promise<DomainRecord | null> {
     try {
