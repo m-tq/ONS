@@ -41,6 +41,7 @@ export function ONSProvider({ children }: ONSProviderProps) {
   // Listen for transaction success events from WalletContext
   useEffect(() => {
     const handleTransactionSuccess = async (event: CustomEvent) => {
+      console.log('ONS Context received transaction success:', event.detail);
       const { txHash } = event.detail;
       if (txHash) {
         await verifyAndProcessTransaction(txHash);
@@ -150,24 +151,33 @@ export function ONSProvider({ children }: ONSProviderProps) {
   const verifyAndProcessTransaction = async (txHash: string) => {
     if (!walletAddress) return;
 
+    console.log('Verifying transaction:', txHash, 'for address:', walletAddress);
+
     try {
       // Get transaction details
       const tx = await octraRpc.getTransaction(txHash);
       if (!tx || tx.status !== 'confirmed') {
-        console.error('Transaction not found or not confirmed');
+        console.error('Transaction not found or not confirmed:', tx);
         return;
       }
+
+      console.log('Transaction details:', tx);
 
       // Check if it's a domain registration transaction
       const message = tx.parsed_tx.message;
       if (message && message.startsWith('register_domain:') && message.endsWith('.oct')) {
         const domain = message.replace('register_domain:', '').replace('.oct', '');
         
+        console.log('Processing domain registration for:', domain);
+        
         // Verify the transaction details
         const isValid = await octraRpc.verifyDomainRegistration(txHash, domain, walletAddress);
+        console.log('Transaction verification result:', isValid);
+        
         if (isValid) {
           // Register in off-chain resolver
           const result = await resolverApi.registerDomain(domain, walletAddress, txHash);
+          console.log('Domain registration result:', result);
           
           if (result) {
             // Refresh user domains and stats
@@ -182,7 +192,11 @@ export function ONSProvider({ children }: ONSProviderProps) {
             
             console.log(`Domain ${domain}.oct registered successfully`);
           }
+        } else {
+          console.error('Transaction verification failed');
         }
+      } else {
+        console.log('Not a domain registration transaction:', message);
       }
     } catch (error) {
       console.error('Error processing transaction:', error);

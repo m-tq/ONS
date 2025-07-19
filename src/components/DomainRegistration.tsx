@@ -23,11 +23,17 @@ export function DomainRegistration() {
   // Listen for domain registration success
   useEffect(() => {
     const handleDomainRegistered = (event: CustomEvent) => {
+      console.log('Domain registered event received:', event.detail);
       const { domain: registeredDomain } = event.detail;
       toast({
         title: "Registration Successful!",
         description: `${registeredDomain} has been registered successfully`,
       });
+      
+      // Reset form
+      setDomain('');
+      setIsAvailable(null);
+      setIsRegistering(false);
     };
 
     window.addEventListener('domainRegistered', handleDomainRegistered as EventListener);
@@ -115,19 +121,22 @@ export function DomainRegistration() {
       if (txHash) {
         toast({
           title: "Transaction Sent!",
-          description: `Transaction sent successfully. Domain registration is being processed...`,
+          description: `Transaction sent successfully. You will be redirected to complete the registration.`,
         });
-        setDomain('');
-        setIsAvailable(null);
+        
+        // Don't reset form here, wait for success callback
+        console.log('Transaction sent, hash:', txHash);
       }
     } catch (error) {
+      console.error('Transaction error:', error);
       toast({
         title: "Transaction Failed",
         description: error instanceof Error ? error.message : "Transaction was cancelled or failed",
         variant: "destructive",
       });
-    } finally {
       setIsRegistering(false);
+    } finally {
+      // Don't set isRegistering to false here, wait for callback
     }
   };
 

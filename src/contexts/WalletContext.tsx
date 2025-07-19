@@ -66,13 +66,15 @@ export function WalletProvider({ children }: WalletProviderProps) {
 
   // Check for existing connection on load
   useEffect(() => {
-    const handleUrlParams = async () => {
+    const handleUrlParams = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const txSuccess = urlParams.get('tx_success');
       const txError = urlParams.get('tx_error');
       const txHash = urlParams.get('tx_hash');
       const accountId = urlParams.get('account_id');
       const publicKey = urlParams.get('public_key');
+
+      console.log('URL Params:', { txSuccess, txError, txHash, accountId, publicKey });
 
       // Handle wallet connection callback
       if (accountId && publicKey) {
@@ -101,7 +103,13 @@ export function WalletProvider({ children }: WalletProviderProps) {
 
       // Handle transaction success
       if (txSuccess === 'true' && txHash) {
+        console.log('Transaction success detected:', txHash);
         setIsProcessingTransaction(false);
+        
+        // Dispatch custom event for ONS context to handle
+        window.dispatchEvent(new CustomEvent('transactionSuccess', { 
+          detail: { txHash } 
+        }));
         
         // Resolve pending transaction promise
         if (pendingTransactionResolve) {
@@ -109,15 +117,11 @@ export function WalletProvider({ children }: WalletProviderProps) {
           setPendingTransactionResolve(null);
           setPendingTransactionReject(null);
         }
-        
-        // Dispatch custom event for ONS context to handle
-        window.dispatchEvent(new CustomEvent('transactionSuccess', { 
-          detail: { txHash } 
-        }));
       }
 
       // Handle transaction error
       if (txError === 'true') {
+        console.log('Transaction error detected');
         setIsProcessingTransaction(false);
         
         // Reject pending transaction promise
@@ -129,8 +133,11 @@ export function WalletProvider({ children }: WalletProviderProps) {
       }
 
       // Clean up URL if there are any params
-      if (urlParams.toString()) {
-        window.history.replaceState({}, document.title, window.location.pathname);
+      if (txSuccess || txError || accountId) {
+        // Use setTimeout to ensure events are processed first
+        setTimeout(() => {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }, 100);
       }
     };
 
@@ -257,7 +264,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [pendingTransactionResolve, pendingTransactionReject]);
+  }, [pendingTransactionResolve, pendingTransactionReject, walletWindow]);
 
   const connectWallet = (providerUrl?: string) => {
     setIsConnecting(true);

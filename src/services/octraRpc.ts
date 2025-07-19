@@ -34,11 +34,15 @@ export class OctraRpcService {
 
   async getTransaction(txHash: string): Promise<OctraTransaction | null> {
     try {
+      console.log('Fetching transaction:', txHash);
       const response = await fetch(`${this.baseUrl}/tx/${txHash}`);
       if (!response.ok) {
+        console.error('Transaction fetch failed:', response.status, response.statusText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      return await response.json();
+      const data = await response.json();
+      console.log('Transaction data:', data);
+      return data;
     } catch (error) {
       console.error('Error fetching transaction:', error);
       return null;
