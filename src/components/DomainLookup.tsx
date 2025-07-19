@@ -6,13 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { useONS } from '../contexts/ONSContext';
 import { useToast } from '../hooks/use-toast';
 import { DomainRecord } from '../services/resolverApi';
+import type { ExtendedDomainRecord } from '../contexts/ONSContext';
 import { Search, Copy, CheckCircle, ExternalLink, Loader2 } from 'lucide-react';
 import { truncateAddress } from '../lib/utils';
 
 export function DomainLookup() {
   const [searchDomain, setSearchDomain] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [searchResult, setSearchResult] = useState<DomainRecord | null>(null);
+  const [searchResult, setSearchResult] = useState<ExtendedDomainRecord | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [copied, setCopied] = useState(false);
   

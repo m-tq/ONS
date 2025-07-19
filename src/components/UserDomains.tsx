@@ -8,7 +8,7 @@ import { Globe, Copy, ExternalLink, CheckCircle, RefreshCw, User, Clock, Trash2,
 import { XCircle } from 'lucide-react';
 import { truncateAddress } from '../lib/utils';
 import { useToast } from '../hooks/use-toast';
-import type { ExtendedDomainRecord } from '../contexts/ONSContext';
+import type { ExtendedDomainRecord, DomainStatus } from '../contexts/ONSContext';
 
 export function UserDomains() {
   const { wallet } = useWallet();

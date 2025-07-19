@@ -289,7 +289,7 @@ export function DomainRegistration() {
 
                 <Button 
                   onClick={handleRegisterWithWallet}
-                  disabled={isRegistering || hasInsufficientBalance}
+                  disabled={isRegistering || Boolean(hasInsufficientBalance)}
                   className="w-full"
                   size="lg"
                 >

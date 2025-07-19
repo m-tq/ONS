@@ -5,7 +5,7 @@ export interface DomainRecord {
   tx_hash: string;
   created_at: string;
   verified: boolean;
-  status?: 'pending' | 'active' | 'deleting' | 'deleted';
+  status?: 'pending' | 'active' | 'deleting' | 'deleted' | 'failed';
   last_verified?: string;
 }
 

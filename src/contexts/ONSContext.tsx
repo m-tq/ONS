@@ -5,7 +5,7 @@ import { octraRpc, WalletBalance } from '../services/octraRpc';
 export type DomainStatus = 'pending' | 'active' | 'deleting' | 'deleted' | 'failed';
 
 export interface ExtendedDomainRecord extends DomainRecord {
-  status: DomainStatus;
+  status: DomainStatus | undefined;
   last_verified?: string;
 }
 
@@ -118,11 +118,11 @@ export function ONSProvider({ children }: ONSProviderProps) {
     };
 
     console.log('ONS Context: Adding transaction success event listener');
-    window.addEventListener('transactionSuccess', handleTransactionSuccess as EventListener);
+    window.addEventListener('transactionSuccess', handleTransactionSuccess as any);
     
     return () => {
       console.log('ONS Context: Removing transaction success event listener');
-      window.removeEventListener('transactionSuccess', handleTransactionSuccess as EventListener);
+      window.removeEventListener('transactionSuccess', handleTransactionSuccess as any);
     };
   }, [walletAddress, processingTransactions]);
 
@@ -205,16 +205,16 @@ export function ONSProvider({ children }: ONSProviderProps) {
             }
             
             // Unknown transaction type, keep current status
-            return domain;
+            return { ...domain, status: domain.status as DomainStatus };
           } catch (error) {
             console.error(`Error verifying domain ${domain.domain}:`, error);
-            return { ...domain, verified: false, status: 'pending' };
+            return { ...domain, verified: false, status: 'pending' as DomainStatus };
           }
         })
       );
       
       console.log('ONS Context: Verified domains:', verifiedDomains);
-      setUserDomains(verifiedDomains);
+      setUserDomains(verifiedDomains as ExtendedDomainRecord[]);
     } catch (error) {
       console.error('Error refreshing user domains:', error);
     } finally {
@@ -316,18 +316,8 @@ export function ONSProvider({ children }: ONSProviderProps) {
   const deleteDomain = async (domain: string): Promise<string | null> => {
     if (!walletAddress) return null;
     
-    try {
-      // Use wallet context to send deletion transaction
-      const { sendTransaction } = await import('../contexts/WalletContext');
-      
-      // We need to get the sendTransaction function from the wallet context
-      // This will be handled by the component calling this function
-      throw new Error('deleteDomain should be called from component with wallet context');
-      
-    } catch (error) {
-      console.error('Error deleting domain:', error);
-      return null;
-    }
+    // This function is not used anymore - deletion is handled directly in components
+    throw new Error('deleteDomain should be called from component with wallet context');
   };
 
   const verifyDomainDeletion = async (domain: string, txHash: string): Promise<boolean> => {

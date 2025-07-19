@@ -53,7 +53,7 @@ export function WalletConnection() {
           Connect your Octra Web Wallet to interact with this DApp
         </p>
         <Button
-          onClick={connectWallet}
+          onClick={() => connectWallet()}
           disabled={isConnecting}
           size="lg"
           className="px-8"

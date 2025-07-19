@@ -27,9 +27,9 @@ export function WalletProviderModal({ isOpen, onClose, onSelectProvider }: Walle
   const getWalletProviders = (): WalletProvider[] => {
     const providersEnv = import.meta.env.VITE_WALLET_PROVIDERS || 'octra.xme.my.id,localhost:5173';
     const useHttps = import.meta.env.VITE_WALLET_USE_HTTPS === 'true';
-    const providerUrls = providersEnv.split(',').map(url => url.trim());
+    const providerUrls = providersEnv.split(',').map((url: string) => url.trim());
     
-    return providerUrls.map(url => {
+    return providerUrls.map((url: string) => {
       const isLocal = url.includes('localhost') || url.includes('127.0.0.1');
       const protocol = isLocal && !useHttps ? 'http' : 'https';
       const fullUrl = url.startsWith('http') ? url : `${protocol}://${url}`;
