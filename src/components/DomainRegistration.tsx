@@ -23,7 +23,7 @@ export function DomainRegistration() {
   // Listen for domain registration success
   useEffect(() => {
     const handleDomainRegistered = (event: CustomEvent) => {
-      console.log('Domain registered event received:', event.detail);
+      console.log('DomainRegistration: Domain registered event received:', event.detail);
       const { domain: registeredDomain } = event.detail;
       toast({
         title: "Registration Successful!",

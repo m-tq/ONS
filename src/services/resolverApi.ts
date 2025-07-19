@@ -22,6 +22,7 @@ export class ResolverApiService {
 
   async registerDomain(domain: string, address: string, txHash: string): Promise<DomainRecord | null> {
     try {
+      console.log('ResolverAPI: Registering domain:', { domain, address, txHash });
       const response = await fetch(`${this.baseUrl}/domains`, {
         method: 'POST',
         headers: {
@@ -35,12 +36,16 @@ export class ResolverApiService {
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('ResolverAPI: Registration failed:', response.status, errorText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      return await response.json();
+      const result = await response.json();
+      console.log('ResolverAPI: Registration successful:', result);
+      return result;
     } catch (error) {
-      console.error('Error registering domain:', error);
+      console.error('ResolverAPI: Error registering domain:', error);
       return null;
     }
   }

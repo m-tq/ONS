@@ -104,18 +104,21 @@ export function WalletProvider({ children }: WalletProviderProps) {
       // Handle transaction success
       if (txSuccess === 'true' && txHash) {
         console.log('Transaction success detected:', txHash);
-        setIsProcessingTransaction(false);
         
         // Dispatch custom event for ONS context to handle
         window.dispatchEvent(new CustomEvent('transactionSuccess', { 
           detail: { txHash } 
         }));
         
+        setIsProcessingTransaction(false);
+        
         // Resolve pending transaction promise
         if (pendingTransactionResolve) {
           pendingTransactionResolve(txHash);
           setPendingTransactionResolve(null);
           setPendingTransactionReject(null);
+        } else {
+          console.log('No pending transaction resolve found, but dispatching event anyway');
         }
       }
 
