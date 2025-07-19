@@ -605,31 +605,6 @@ export function WalletProvider({ children }: WalletProviderProps) {
         setPendingTransactionResolve(() => resolve);
         setPendingTransactionReject(() => reject);
         
-        // Set timeout untuk menghindari hanging promise
-        const timeout = setTimeout(() => {
-          setIsProcessingTransaction(false);
-          clearPendingTransaction();
-          setPendingTransactionResolve(null);
-          setPendingTransactionReject(null);
-          reject(new Error('Transaction timeout'));
-        }, 300000); // 5 menit timeout
-
-        // Clear timeout when promise resolves/rejects
-        const originalResolve = resolve;
-        const originalReject = reject;
-        
-        setPendingTransactionResolve(() => (value: string | null) => {
-          clearTimeout(timeout);
-          clearPendingTransaction();
-          originalResolve(value);
-        });
-        
-        setPendingTransactionReject(() => (reason?: any) => {
-          clearTimeout(timeout);
-          clearPendingTransaction();
-          originalReject(reason);
-        });
-        
         // Redirect ke wallet untuk transaction
         // Open wallet in new tab for transaction confirmation
         const transactionWindow = window.open(`${walletUrl}?${params.toString()}`, '_blank');
@@ -640,19 +615,17 @@ export function WalletProvider({ children }: WalletProviderProps) {
           const checkClosed = setInterval(() => {
             if (transactionWindow.closed) {
               clearInterval(checkClosed);
-              // Window closed normally, don't treat as error
-              // Transaction might still be processing
+              // Window closed, just clean up without error
+              setIsProcessingTransaction(false);
               setWalletWindow(null);
             }
           }, 1000);
           
-          // Set timeout to stop checking after 5 minutes
+          // Stop checking after 5 minutes
           setTimeout(() => {
             clearInterval(checkClosed);
-            // Don't automatically reject on timeout for deletion transactions
-            // Let user verify manually
             setIsProcessingTransaction(false);
-          }, 300000); // 5 minutes timeout
+          }, 300000);
         }
       });
     } catch (error) {
