@@ -36,10 +36,17 @@ export function DomainRegistration() {
       setIsRegistering(false);
     };
 
+    const handleTransactionSuccess = (event: CustomEvent) => {
+      console.log('DomainRegistration: Transaction success event received:', event.detail);
+      // Reset registration state when transaction succeeds
+      setIsRegistering(false);
+    };
     window.addEventListener('domainRegistered', handleDomainRegistered as EventListener);
+    window.addEventListener('transactionSuccess', handleTransactionSuccess as EventListener);
     
     return () => {
       window.removeEventListener('domainRegistered', handleDomainRegistered as EventListener);
+      window.removeEventListener('transactionSuccess', handleTransactionSuccess as EventListener);
     };
   }, [toast]);
 

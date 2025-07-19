@@ -42,8 +42,9 @@ export function ONSProvider({ children }: ONSProviderProps) {
   useEffect(() => {
     const handleTransactionSuccess = async (event: CustomEvent) => {
       console.log('ONS Context received transaction success:', event.detail);
-      const { txHash } = event.detail;
+      const { txHash, pendingTransaction } = event.detail;
       if (txHash) {
+        console.log('Processing transaction with pending info:', pendingTransaction);
         await verifyAndProcessTransaction(txHash);
       }
     };

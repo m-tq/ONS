@@ -25,6 +25,12 @@ export function useWallet() {
   return context;
 }
 
+interface PendingTransaction {
+  timestamp: number;
+  to: string;
+  amount: string;
+  message?: string;
+}
 interface WalletProviderProps {
   children: ReactNode;
 }
@@ -64,6 +70,30 @@ export function WalletProvider({ children }: WalletProviderProps) {
     });
   };
 
+  // Helper functions for pending transaction management
+  const savePendingTransaction = (transaction: PendingTransaction) => {
+    localStorage.setItem('octra-dapp-pending-tx', JSON.stringify(transaction));
+  };
+
+  const getPendingTransaction = (): PendingTransaction | null => {
+    try {
+      const saved = localStorage.getItem('octra-dapp-pending-tx');
+      if (saved) {
+        const transaction = JSON.parse(saved);
+        // Check if transaction is not too old (5 minutes)
+        if (Date.now() - transaction.timestamp < 300000) {
+          return transaction;
+        }
+      }
+    } catch (error) {
+      console.error('Error parsing pending transaction:', error);
+    }
+    return null;
+  };
+
+  const clearPendingTransaction = () => {
+    localStorage.removeItem('octra-dapp-pending-tx');
+  };
   // Check for existing connection on load
   useEffect(() => {
     const handleUrlParams = () => {
@@ -105,20 +135,26 @@ export function WalletProvider({ children }: WalletProviderProps) {
       if (txSuccess === 'true' && txHash) {
         console.log('Transaction success detected:', txHash);
         
+        // Check if we have a pending transaction
+        const pendingTx = getPendingTransaction();
+        console.log('Pending transaction found:', pendingTx);
+        
         // Dispatch custom event for ONS context to handle
         window.dispatchEvent(new CustomEvent('transactionSuccess', { 
-          detail: { txHash } 
+          detail: { txHash, pendingTransaction: pendingTx } 
         }));
         
         setIsProcessingTransaction(false);
+        clearPendingTransaction();
         
         // Resolve pending transaction promise
         if (pendingTransactionResolve) {
+          console.log('Resolving pending transaction promise');
           pendingTransactionResolve(txHash);
           setPendingTransactionResolve(null);
           setPendingTransactionReject(null);
         } else {
-          console.log('No pending transaction resolve found, but dispatching event anyway');
+          console.log('No pending transaction resolve found, but event dispatched for ONS context');
         }
       }
 
@@ -126,6 +162,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
       if (txError === 'true') {
         console.log('Transaction error detected');
         setIsProcessingTransaction(false);
+        clearPendingTransaction();
         
         // Reject pending transaction promise
         if (pendingTransactionReject) {
@@ -204,6 +241,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
       } else if (event.data.type === 'WALLET_TRANSACTION_SUCCESS') {
         const { txHash } = event.data;
         setIsProcessingTransaction(false);
+        clearPendingTransaction();
         
         // Resolve pending transaction promise
         if (pendingTransactionResolve) {
@@ -223,6 +261,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
         }
       } else if (event.data.type === 'WALLET_TRANSACTION_REJECTED') {
         setIsProcessingTransaction(false);
+        clearPendingTransaction();
         
         // Reject pending transaction promise
         if (pendingTransactionReject) {
@@ -261,6 +300,12 @@ export function WalletProvider({ children }: WalletProviderProps) {
       }
     }
 
+    // Check if we're returning from a transaction and restore processing state
+    const pendingTx = getPendingTransaction();
+    if (pendingTx) {
+      console.log('Restoring transaction processing state');
+      setIsProcessingTransaction(true);
+    }
     handleUrlParams();
     
     // Cleanup function
@@ -307,6 +352,14 @@ export function WalletProvider({ children }: WalletProviderProps) {
 
     setIsProcessingTransaction(true);
 
+    // Save pending transaction info
+    const pendingTransaction: PendingTransaction = {
+      timestamp: Date.now(),
+      to,
+      amount,
+      message
+    };
+    savePendingTransaction(pendingTransaction);
     try {
       // Use the same provider that was used for connection
       let walletUrl = selectedProvider;
@@ -352,6 +405,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
         // Set timeout untuk menghindari hanging promise
         const timeout = setTimeout(() => {
           setIsProcessingTransaction(false);
+          clearPendingTransaction();
           setPendingTransactionResolve(null);
           setPendingTransactionReject(null);
           reject(new Error('Transaction timeout'));
@@ -363,11 +417,13 @@ export function WalletProvider({ children }: WalletProviderProps) {
         
         setPendingTransactionResolve(() => (value: string | null) => {
           clearTimeout(timeout);
+          clearPendingTransaction();
           originalResolve(value);
         });
         
         setPendingTransactionReject(() => (reason?: any) => {
           clearTimeout(timeout);
+          clearPendingTransaction();
           originalReject(reason);
         });
         
@@ -377,6 +433,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
     } catch (error) {
       console.error('Error sending transaction:', error);
       setIsProcessingTransaction(false);
+      clearPendingTransaction();
       return null;
     }
   };
@@ -390,6 +447,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
     setSelectedProvider(null);
     localStorage.removeItem('octra-dapp-wallet');
     localStorage.removeItem('octra-dapp-selected-provider');
+    clearPendingTransaction();
   };
 
   return (
