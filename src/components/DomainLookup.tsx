@@ -80,7 +80,8 @@ export function DomainLookup() {
   };
 
   const openTransaction = (txHash: string) => {
-    window.open(`https://octra.network/tx/${txHash}`, '_blank');
+    const explorerUrl = import.meta.env.VITE_EXPLORER_URL || 'https://octrascan.io';
+    window.open(`${explorerUrl}/tx/${txHash}`, '_blank');
   };
 
   return (

@@ -377,8 +377,28 @@ export function WalletProvider({ children }: WalletProviderProps) {
       app_name: import.meta.env.VITE_APP_NAME || 'ONS - Octra Name Service'
     });
 
-    // Redirect ke wallet untuk connection
-    window.location.href = `${walletUrl}?${params.toString()}`;
+    // Open wallet in new tab instead of redirect
+    const walletWindow = window.open(`${walletUrl}?${params.toString()}`, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
+    setWalletWindow(walletWindow);
+    
+    // Monitor wallet window
+    if (walletWindow) {
+      const checkClosed = setInterval(() => {
+        if (walletWindow.closed) {
+          clearInterval(checkClosed);
+          setIsConnecting(false);
+          setWalletWindow(null);
+        }
+      }, 1000);
+      
+      // Set timeout to stop checking after 5 minutes
+      setTimeout(() => {
+        clearInterval(checkClosed);
+        if (!walletWindow.closed) {
+          setIsConnecting(false);
+        }
+      }, 300000);
+    }
   };
 
   const sendTransaction = async (to: string, amount: string, message?: string): Promise<string | null> => {

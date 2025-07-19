@@ -55,7 +55,8 @@ export function Header() {
 
   const openExplorer = () => {
     if (wallet.address) {
-      window.open(`https://octra.network/addr/${wallet.address}`, '_blank');
+      const explorerUrl = import.meta.env.VITE_EXPLORER_URL || 'https://octrascan.io';
+      window.open(`${explorerUrl}/address/${wallet.address}`, '_blank');
     }
   };
 
@@ -65,6 +66,7 @@ export function Header() {
 
   const handleSelectProvider = (providerUrl: string) => {
     connectWallet(providerUrl);
+    setShowWalletModal(false);
   };
 
   return (
@@ -147,7 +149,7 @@ export function Header() {
                 {isConnecting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Connecting...
+                    Waiting for wallet...
                   </>
                 ) : (
                   <>

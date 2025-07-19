@@ -16,6 +16,10 @@ export function UserDomains() {
   const [verifyingDomains, setVerifyingDomains] = useState<Set<number>>(new Set());
   const [deletingDomains, setDeletingDomains] = useState<Set<number>>(new Set());
 
+  const getExplorerUrl = () => {
+    return import.meta.env.VITE_EXPLORER_URL || 'https://octrascan.io';
+  };
+
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -33,7 +37,7 @@ export function UserDomains() {
   };
 
   const openTransaction = (txHash: string) => {
-    window.open(`https://octra.network/tx/${txHash}`, '_blank');
+    window.open(`${getExplorerUrl()}/tx/${txHash}`, '_blank');
   };
 
   const handleVerifyDomain = async (domain: ExtendedDomainRecord) => {
@@ -224,15 +228,22 @@ export function UserDomains() {
                     <div className="flex items-center space-x-2">
                       {(domain.status === 'pending' || domain.status === 'deleting') && (
                         <Button
-                          variant="ghost"
+                          variant={domain.status === 'pending' ? 'default' : 'ghost'}
                           size="sm"
                           onClick={() => handleVerifyDomain(domain)}
                           disabled={verifyingDomains.has(domain.id)}
+                          className={domain.status === 'pending' ? 'bg-yellow-500 hover:bg-yellow-600 text-white animate-pulse' : ''}
                         >
                           {verifyingDomains.has(domain.id) ? (
-                            <RefreshCw className="h-4 w-4 animate-spin" />
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                              {domain.status === 'pending' ? 'Verifying...' : 'Checking...'}
+                            </>
                           ) : (
-                            <CheckCircle className="h-4 w-4" />
+                            <>
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              {domain.status === 'pending' ? 'Verify' : 'Check'}
+                            </>
                           )}
                         </Button>
                       )}
@@ -281,7 +292,7 @@ export function UserDomains() {
                     </div>
                     {domain.status === 'pending' && (
                       <div className="text-yellow-600 dark:text-yellow-400 text-xs">
-                        ⏳ Waiting for blockchain confirmation (2-3 minutes)
+                        ⏳ Waiting for blockchain confirmation (2-3 minutes) - Click "Verify" to check status
                       </div>
                     )}
                     {domain.status === 'deleting' && (

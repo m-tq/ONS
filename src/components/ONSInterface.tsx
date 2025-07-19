@@ -1,4 +1,5 @@
 import React from 'react';
+import { useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { DomainRegistration } from './DomainRegistration';
@@ -12,7 +13,18 @@ import { Coins, Globe, Search, BarChart3, User } from 'lucide-react';
 
 export function ONSInterface() {
   const { wallet } = useWallet();
-  const { walletBalance } = useONS();
+  const { walletBalance, refreshUserDomains, refreshGlobalStats } = useONS();
+
+  const handleTabChange = (value: string) => {
+    console.log('Tab changed to:', value);
+    if (value === 'domains' && wallet.isConnected) {
+      console.log('Auto refreshing user domains');
+      refreshUserDomains();
+    } else if (value === 'stats') {
+      console.log('Auto refreshing global stats');
+      refreshGlobalStats();
+    }
+  };
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -56,7 +68,7 @@ export function ONSInterface() {
       )}
 
       {/* Main Interface */}
-      <Tabs defaultValue="register" className="space-y-6">
+      <Tabs defaultValue="register" className="space-y-6" onValueChange={handleTabChange}>
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="register" className="flex items-center space-x-2">
             <Globe className="h-4 w-4" />

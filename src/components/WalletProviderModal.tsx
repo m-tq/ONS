@@ -39,7 +39,7 @@ export function WalletProviderModal({ isOpen, onClose, onSelectProvider }: Walle
         url: fullUrl,
         description: isLocal 
           ? 'Development wallet running locally'
-          : 'Official Octra Web Wallet',
+          : 'Official Octra Web Wallet (opens in new tab)',
         isLocal
       };
     });
@@ -56,7 +56,7 @@ export function WalletProviderModal({ isOpen, onClose, onSelectProvider }: Walle
             <span>Select Wallet Provider</span>
           </DialogTitle>
           <DialogDescription>
-            Choose a wallet provider to connect to ONS
+            Choose a wallet provider to connect to ONS. The wallet will open in a new tab.
           </DialogDescription>
         </DialogHeader>
         
@@ -95,7 +95,7 @@ export function WalletProviderModal({ isOpen, onClose, onSelectProvider }: Walle
         
         <div className="text-center pt-4">
           <p className="text-xs text-muted-foreground">
-            Make sure you trust the wallet provider before connecting
+            The wallet will open in a new tab. Complete the connection there and return to this page.
           </p>
         </div>
       </DialogContent>
