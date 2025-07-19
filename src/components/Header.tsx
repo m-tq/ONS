@@ -56,7 +56,7 @@ export function Header() {
   const openExplorer = () => {
     if (wallet.address) {
       const explorerUrl = import.meta.env.VITE_EXPLORER_URL || 'https://octrascan.io';
-      window.open(`${explorerUrl}/address/${wallet.address}`, '_blank');
+      window.open(`${explorerUrl}/addr/${wallet.address}`, '_blank');
     }
   };
 
