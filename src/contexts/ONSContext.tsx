@@ -38,6 +38,22 @@ export function ONSProvider({ children }: ONSProviderProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
+  // Listen for transaction success events from WalletContext
+  useEffect(() => {
+    const handleTransactionSuccess = async (event: CustomEvent) => {
+      const { txHash } = event.detail;
+      if (txHash) {
+        await verifyAndProcessTransaction(txHash);
+      }
+    };
+
+    window.addEventListener('transactionSuccess', handleTransactionSuccess as EventListener);
+    
+    return () => {
+      window.removeEventListener('transactionSuccess', handleTransactionSuccess as EventListener);
+    };
+  }, [walletAddress]);
+
   // Method to set wallet address from WalletContext
   const setWalletAddressFromContext = (address: string | null) => {
     setWalletAddress(address);
@@ -151,13 +167,21 @@ export function ONSProvider({ children }: ONSProviderProps) {
         const isValid = await octraRpc.verifyDomainRegistration(txHash, domain, walletAddress);
         if (isValid) {
           // Register in off-chain resolver
-          await resolverApi.registerDomain(domain, walletAddress, txHash);
+          const result = await resolverApi.registerDomain(domain, walletAddress, txHash);
           
-          // Refresh user domains and stats
-          await refreshUserDomains();
-          await refreshGlobalStats();
-          
-          console.log(`Domain ${domain}.oct registered successfully`);
+          if (result) {
+            // Refresh user domains and stats
+            await refreshUserDomains();
+            await refreshGlobalStats();
+            await refreshWalletBalance();
+            
+            // Show success notification
+            window.dispatchEvent(new CustomEvent('domainRegistered', { 
+              detail: { domain: `${domain}.oct`, txHash } 
+            }));
+            
+            console.log(`Domain ${domain}.oct registered successfully`);
+          }
         }
       }
     } catch (error) {

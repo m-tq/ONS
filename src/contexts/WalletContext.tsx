@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useONS } from './ONSContext';
 
 interface WalletState {
   isConnected: boolean;
@@ -13,6 +12,7 @@ interface WalletContextType {
   disconnectWallet: () => void;
   isConnecting: boolean;
   sendTransaction: (to: string, amount: string, message?: string) => Promise<string | null>;
+  isProcessingTransaction: boolean;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -30,15 +30,17 @@ interface WalletProviderProps {
 }
 
 export function WalletProvider({ children }: WalletProviderProps) {
-  const onsContext = useONS();
   const [wallet, setWallet] = useState<WalletState>({
     isConnected: false,
     address: null,
     publicKey: null,
   });
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isProcessingTransaction, setIsProcessingTransaction] = useState(false);
   const [walletWindow, setWalletWindow] = useState<Window | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [pendingTransactionResolve, setPendingTransactionResolve] = useState<((value: string | null) => void) | null>(null);
+  const [pendingTransactionReject, setPendingTransactionReject] = useState<((reason?: any) => void) | null>(null);
 
   // Helper function to get wallet providers
   const getWalletProviders = () => {
@@ -64,6 +66,74 @@ export function WalletProvider({ children }: WalletProviderProps) {
 
   // Check for existing connection on load
   useEffect(() => {
+    const handleUrlParams = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const txSuccess = urlParams.get('tx_success');
+      const txError = urlParams.get('tx_error');
+      const txHash = urlParams.get('tx_hash');
+      const accountId = urlParams.get('account_id');
+      const publicKey = urlParams.get('public_key');
+
+      // Handle wallet connection callback
+      if (accountId && publicKey) {
+        const walletData = {
+          address: accountId,
+          publicKey: publicKey,
+        };
+
+        setWallet({
+          isConnected: true,
+          address: accountId,
+          publicKey: publicKey,
+        });
+
+        // Save to localStorage
+        localStorage.setItem('octra-dapp-wallet', JSON.stringify(walletData));
+        
+        // Try to determine which provider was used based on referrer or current URL
+        const savedProvider = localStorage.getItem('octra-dapp-selected-provider');
+        if (savedProvider) {
+          setSelectedProvider(savedProvider);
+        }
+        
+        setIsConnecting(false);
+      }
+
+      // Handle transaction success
+      if (txSuccess === 'true' && txHash) {
+        setIsProcessingTransaction(false);
+        
+        // Resolve pending transaction promise
+        if (pendingTransactionResolve) {
+          pendingTransactionResolve(txHash);
+          setPendingTransactionResolve(null);
+          setPendingTransactionReject(null);
+        }
+        
+        // Dispatch custom event for ONS context to handle
+        window.dispatchEvent(new CustomEvent('transactionSuccess', { 
+          detail: { txHash } 
+        }));
+      }
+
+      // Handle transaction error
+      if (txError === 'true') {
+        setIsProcessingTransaction(false);
+        
+        // Reject pending transaction promise
+        if (pendingTransactionReject) {
+          pendingTransactionReject(new Error('Transaction failed or was cancelled'));
+          setPendingTransactionResolve(null);
+          setPendingTransactionReject(null);
+        }
+      }
+
+      // Clean up URL if there are any params
+      if (urlParams.toString()) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    };
+
     // Listen for messages from wallet window
     const handleMessage = (event: MessageEvent) => {
       // Verify origin for security
@@ -123,14 +193,34 @@ export function WalletProvider({ children }: WalletProviderProps) {
         }
       } else if (event.data.type === 'WALLET_TRANSACTION_SUCCESS') {
         const { txHash } = event.data;
-        if (txHash && onsContext) {
-          onsContext.verifyAndProcessTransaction(txHash);
+        setIsProcessingTransaction(false);
+        
+        // Resolve pending transaction promise
+        if (pendingTransactionResolve) {
+          pendingTransactionResolve(txHash);
+          setPendingTransactionResolve(null);
+          setPendingTransactionReject(null);
         }
+        
+        // Dispatch custom event for ONS context to handle
+        window.dispatchEvent(new CustomEvent('transactionSuccess', { 
+          detail: { txHash } 
+        }));
+        
         if (walletWindow) {
           walletWindow.close();
           setWalletWindow(null);
         }
       } else if (event.data.type === 'WALLET_TRANSACTION_REJECTED') {
+        setIsProcessingTransaction(false);
+        
+        // Reject pending transaction promise
+        if (pendingTransactionReject) {
+          pendingTransactionReject(new Error('Transaction was rejected'));
+          setPendingTransactionResolve(null);
+          setPendingTransactionReject(null);
+        }
+        
         if (walletWindow) {
           walletWindow.close();
           setWalletWindow(null);
@@ -139,49 +229,6 @@ export function WalletProvider({ children }: WalletProviderProps) {
     };
 
     window.addEventListener('message', handleMessage);
-
-    const handleUrlParams = async () => {
-      const urlParams = new URLSearchParams(window.location.search);
-      const txSuccess = urlParams.get('tx_success');
-      const txHash = urlParams.get('tx_hash');
-      const accountId = urlParams.get('account_id');
-      const publicKey = urlParams.get('public_key');
-
-      // Handle wallet connection callback
-      if (accountId && publicKey) {
-        const walletData = {
-          address: accountId,
-          publicKey: publicKey,
-        };
-
-        setWallet({
-          isConnected: true,
-          address: accountId,
-          publicKey: publicKey,
-        });
-
-        // Save to localStorage
-        localStorage.setItem('octra-dapp-wallet', JSON.stringify(walletData));
-        
-        // Try to determine which provider was used based on referrer or current URL
-        const savedProvider = localStorage.getItem('octra-dapp-selected-provider');
-        if (savedProvider) {
-          setSelectedProvider(savedProvider);
-        }
-        
-        setIsConnecting(false);
-      }
-
-      // Handle transaction success
-      if (txSuccess === 'true' && txHash) {
-        await handleTransactionSuccess(txHash);
-      }
-
-      // Clean up URL if there are any params
-      if (urlParams.toString()) {
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    };
 
     const savedWallet = localStorage.getItem('octra-dapp-wallet');
     if (savedWallet) {
@@ -205,18 +252,12 @@ export function WalletProvider({ children }: WalletProviderProps) {
     }
 
     handleUrlParams();
-  }, []);
-
-  const handleTransactionSuccess = async (txHash: string) => {
-    if (!onsContext) return;
     
-    try {
-      // Verify and process the transaction
-      await onsContext.verifyAndProcessTransaction(txHash);
-    } catch (error) {
-      console.error('Error handling transaction success:', error);
-    }
-  };
+    // Cleanup function
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [pendingTransactionResolve, pendingTransactionReject]);
 
   const connectWallet = (providerUrl?: string) => {
     setIsConnecting(true);
@@ -254,6 +295,8 @@ export function WalletProvider({ children }: WalletProviderProps) {
       throw new Error('Wallet not connected');
     }
 
+    setIsProcessingTransaction(true);
+
     try {
       // Use the same provider that was used for connection
       let walletUrl = selectedProvider;
@@ -290,45 +333,40 @@ export function WalletProvider({ children }: WalletProviderProps) {
         params.append('message', message);
       }
 
-      // Redirect ke wallet untuk transaction
-      window.location.href = `${walletUrl}?${params.toString()}`;
-      
       // Return promise yang akan di-resolve setelah redirect kembali
       return new Promise((resolve, reject) => {
+        // Store promise resolvers
+        setPendingTransactionResolve(() => resolve);
+        setPendingTransactionReject(() => reject);
+        
         // Set timeout untuk menghindari hanging promise
         const timeout = setTimeout(() => {
+          setIsProcessingTransaction(false);
+          setPendingTransactionResolve(null);
+          setPendingTransactionReject(null);
           reject(new Error('Transaction timeout'));
         }, 300000); // 5 menit timeout
 
-        // Check for transaction result in URL params
-        const checkResult = () => {
-          const urlParams = new URLSearchParams(window.location.search);
-          const txSuccess = urlParams.get('tx_success');
-          const txError = urlParams.get('tx_error');
-          const txHash = urlParams.get('tx_hash');
-
-          if (txSuccess === 'true' && txHash) {
-            clearTimeout(timeout);
-            // Clean up URL
-            window.history.replaceState({}, document.title, window.location.pathname);
-            resolve(txHash);
-          } else if (txError === 'true') {
-            clearTimeout(timeout);
-            // Clean up URL
-            window.history.replaceState({}, document.title, window.location.pathname);
-            reject(new Error('Transaction failed'));
-          }
-        };
-
-        // Check immediately and then periodically
-        checkResult();
-        const interval = setInterval(checkResult, 1000);
+        // Clear timeout when promise resolves/rejects
+        const originalResolve = resolve;
+        const originalReject = reject;
         
-        // Clear interval when promise resolves/rejects
-        setTimeout(() => clearInterval(interval), 300000);
+        setPendingTransactionResolve(() => (value: string | null) => {
+          clearTimeout(timeout);
+          originalResolve(value);
+        });
+        
+        setPendingTransactionReject(() => (reason?: any) => {
+          clearTimeout(timeout);
+          originalReject(reason);
+        });
+        
+        // Redirect ke wallet untuk transaction
+        window.location.href = `${walletUrl}?${params.toString()}`;
       });
     } catch (error) {
       console.error('Error sending transaction:', error);
+      setIsProcessingTransaction(false);
       return null;
     }
   };
@@ -351,6 +389,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
       disconnectWallet,
       isConnecting,
       sendTransaction,
+      isProcessingTransaction,
     }}>
       {children}
     </WalletContext.Provider>

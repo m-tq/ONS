@@ -17,8 +17,25 @@ export function DomainRegistration() {
   const [isRegistering, setIsRegistering] = useState(false);
   
   const { checkDomainAvailability, registerDomain, walletBalance } = useONS();
-  const { wallet, sendTransaction } = useWallet();
+  const { wallet, sendTransaction, isProcessingTransaction } = useWallet();
   const { toast } = useToast();
+
+  // Listen for domain registration success
+  useEffect(() => {
+    const handleDomainRegistered = (event: CustomEvent) => {
+      const { domain: registeredDomain } = event.detail;
+      toast({
+        title: "Registration Successful!",
+        description: `${registeredDomain} has been registered successfully`,
+      });
+    };
+
+    window.addEventListener('domainRegistered', handleDomainRegistered as EventListener);
+    
+    return () => {
+      window.removeEventListener('domainRegistered', handleDomainRegistered as EventListener);
+    };
+  }, [toast]);
 
   const handleCheckAvailability = async () => {
     if (!domain.trim()) {
@@ -96,23 +113,12 @@ export function DomainRegistration() {
       );
 
       if (txHash) {
-        // Register domain with the transaction hash
-        const success = await registerDomain(domain, txHash);
-        
-        if (success) {
-          toast({
-            title: "Registration Successful!",
-            description: `${domain}.oct has been registered successfully`,
-          });
-          setDomain('');
-          setIsAvailable(null);
-        } else {
-          toast({
-            title: "Registration Failed",
-            description: "Failed to register domain. Please try again.",
-            variant: "destructive",
-          });
-        }
+        toast({
+          title: "Transaction Sent!",
+          description: `Transaction sent successfully. Domain registration is being processed...`,
+        });
+        setDomain('');
+        setIsAvailable(null);
       }
     } catch (error) {
       toast({
@@ -126,6 +132,7 @@ export function DomainRegistration() {
   };
 
   const hasInsufficientBalance = walletBalance && parseFloat(walletBalance.balance) < 0.5;
+  const isProcessing = isRegistering || isProcessingTransaction;
 
   return (
     <div className="space-y-6">
@@ -250,14 +257,14 @@ export function DomainRegistration() {
 
                 <Button 
                   onClick={handleRegisterWithWallet}
-                  disabled={isRegistering || hasInsufficientBalance}
+                  disabled={isProcessing || hasInsufficientBalance}
                   className="w-full"
                   size="lg"
                 >
-                  {isRegistering ? (
+                  {isProcessing ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Processing Registration...
+                      {isProcessingTransaction ? 'Processing Transaction...' : 'Preparing Registration...'}
                     </>
                   ) : (
                     <>
