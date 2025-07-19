@@ -118,16 +118,21 @@ app.put('/api/domains/:domain/status', (req, res) => {
     return res.status(400).json({ error: 'Status is required' });
   }
 
+  console.log(`Updating domain ${domain} status to: ${status}`);
+
   db.run(
     'UPDATE domains SET status = ?, verified = ?, last_verified = CURRENT_TIMESTAMP WHERE domain = ?',
     [status, status === 'active', domain],
     function(err) {
       if (err) {
+        console.error('Database error updating domain status:', err);
         return res.status(500).json({ error: 'Database error' });
       }
       if (this.changes === 0) {
+        console.log(`Domain ${domain} not found for status update`);
         return res.status(404).json({ error: 'Domain not found' });
       }
+      console.log(`Successfully updated domain ${domain} status to ${status}, changes: ${this.changes}`);
       res.json({ success: true, updated: this.changes });
     }
   );

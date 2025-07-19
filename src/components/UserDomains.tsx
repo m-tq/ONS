@@ -89,14 +89,22 @@ export function UserDomains() {
       );
       
       if (txHash) {
+        console.log('UserDomains: Deletion transaction sent:', txHash);
         toast({
           title: "Deletion Initiated",
           description: `Domain deletion transaction sent. Please confirm in wallet.`,
         });
+        
+        // Immediately update domain status to 'deleting' in local state
+        const updatedDomains = userDomains.map(d => 
+          d.id === domain.id ? { ...d, status: 'deleting' as DomainStatus } : d
+        );
+        // This would need to be exposed from ONS context, for now we'll rely on the transaction processing
       } else {
         throw new Error('Failed to send deletion transaction');
       }
     } catch (error) {
+      console.error('UserDomains: Deletion error:', error);
       toast({
         title: "Deletion Failed",
         description: error instanceof Error ? error.message : "Failed to delete domain",

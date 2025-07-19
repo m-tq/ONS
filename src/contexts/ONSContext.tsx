@@ -163,11 +163,18 @@ export function ONSProvider({ children }: ONSProviderProps) {
     try {
       // First get domains from database
       const dbDomains = await resolverApi.getDomainsByAddress(targetAddress);
+      console.log('ONS Context: Raw domains from database:', dbDomains);
       
       // Verify each domain on-chain
       const verifiedDomains = await Promise.all(
         dbDomains.map(async (domain) => {
           try {
+            // If domain is already marked as deleted, keep it as deleted
+            if (domain.status === 'deleted') {
+              console.log(`Domain ${domain.domain} is marked as deleted, keeping status`);
+              return domain;
+            }
+            
             // Skip verification for very recent transactions (less than 2 minutes old)
             const domainAge = Date.now() - new Date(domain.created_at).getTime();
             if (domainAge < 120000) { // 2 minutes
@@ -182,12 +189,21 @@ export function ONSProvider({ children }: ONSProviderProps) {
               return { ...domain, verified: false, status: 'pending' };
             }
             
-            const isValid = tx.status === 'confirmed' && 
-                           tx.parsed_tx.to === octraRpc.getMasterWallet() &&
-                           parseFloat(tx.parsed_tx.amount) >= 0.5 &&
-                           tx.parsed_tx.message === `register_domain:${domain.domain}.oct`;
+            // Check if this is a registration or deletion transaction
+            if (tx.parsed_tx.message === `register_domain:${domain.domain}.oct`) {
+              const isValid = tx.status === 'confirmed' && 
+                             tx.parsed_tx.to === octraRpc.getMasterWallet() &&
+                             parseFloat(tx.parsed_tx.amount) >= 0.5;
+              
+              return { ...domain, verified: isValid, status: isValid ? 'active' : 'pending' };
+            } else if (tx.parsed_tx.message === `delete_domain:${domain.domain}.oct`) {
+              // This is a deletion transaction
+              const isConfirmed = tx.status === 'confirmed';
+              return { ...domain, verified: false, status: isConfirmed ? 'deleted' : 'deleting' };
+            }
             
-            return { ...domain, verified: isValid, status: isValid ? 'active' : 'pending' };
+            // Unknown transaction type, keep current status
+            return domain;
           } catch (error) {
             console.error(`Error verifying domain ${domain.domain}:`, error);
             return { ...domain, verified: false, status: 'pending' };
@@ -195,6 +211,7 @@ export function ONSProvider({ children }: ONSProviderProps) {
         })
       );
       
+      console.log('ONS Context: Verified domains:', verifiedDomains);
       setUserDomains(verifiedDomains);
     } catch (error) {
       console.error('Error refreshing user domains:', error);
@@ -397,22 +414,30 @@ export function ONSProvider({ children }: ONSProviderProps) {
         console.log('ONS Context: Processing domain deletion for:', domain);
         
         const status = tx.status === 'confirmed' ? 'deleted' : 'deleting';
+        console.log('ONS Context: Domain deletion status will be:', status);
         
         // Update domain status
         const result = await resolverApi.updateDomainStatus(domain, status);
+        console.log('ONS Context: Domain status update result:', result);
+        
         if (result) {
           await refreshUserDomains(targetAddress);
           await refreshGlobalStats();
+          await refreshWalletBalance(targetAddress);
           
           if (tx.status === 'confirmed') {
             window.dispatchEvent(new CustomEvent('domainDeleted', { 
               detail: { domain: `${domain}.oct`, txHash } 
             }));
+            console.log(`ONS Context: Domain ${domain}.oct deleted successfully`);
           } else {
             window.dispatchEvent(new CustomEvent('domainDeleting', { 
               detail: { domain: `${domain}.oct`, txHash } 
             }));
+            console.log(`ONS Context: Domain ${domain}.oct deletion pending`);
           }
+        } else {
+          console.error('ONS Context: Failed to update domain status in resolver API');
         }
       } else {
         console.log('ONS Context: Not a domain-related transaction:', message);

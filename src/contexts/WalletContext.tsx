@@ -227,11 +227,37 @@ export function WalletProvider({ children }: WalletProviderProps) {
       }
       
       setIsConnecting(false);
+      
+      // Clean URL immediately to prevent re-processing
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
 
     // Handle transaction success
     if (txSuccess === 'true' && txHash) {
       console.log('Transaction success detected:', txHash);
+      
+      // Check if this is a new tab (has connection attempt or is different from main tab)
+      const isNewTab = window.opener || document.referrer.includes('octra') || 
+                      localStorage.getItem('octra-dapp-connection-attempt');
+      
+      if (isNewTab && window.opener) {
+        // This is a new tab, signal to parent tab and close
+        try {
+          window.opener.postMessage({
+            type: 'WALLET_TRANSACTION_SUCCESS',
+            txHash: txHash
+          }, window.location.origin);
+        } catch (error) {
+          console.error('Error posting message to parent:', error);
+        }
+        
+        // Close this tab after a short delay
+        setTimeout(() => {
+          window.close();
+        }, 1000);
+        
+        return; // Don't process in this tab
+      }
       
       // Check if this transaction was already processed
       const storedProcessed = localStorage.getItem('octra-dapp-processed-tx');
@@ -280,11 +306,35 @@ export function WalletProvider({ children }: WalletProviderProps) {
         console.log('No pending transaction resolve found, but event dispatched for ONS context');
       }
       }, 500);
+      
+      // Clean URL immediately to prevent re-processing
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
 
     // Handle transaction error
     if (txError === 'true') {
       console.log('Transaction error detected');
+      
+      // Check if this is a new tab
+      const isNewTab = window.opener || document.referrer.includes('octra');
+      
+      if (isNewTab && window.opener) {
+        // Signal to parent tab and close
+        try {
+          window.opener.postMessage({
+            type: 'WALLET_TRANSACTION_REJECTED'
+          }, window.location.origin);
+        } catch (error) {
+          console.error('Error posting message to parent:', error);
+        }
+        
+        setTimeout(() => {
+          window.close();
+        }, 1000);
+        
+        return;
+      }
+      
       setIsProcessingTransaction(false);
       clearPendingTransaction();
       
@@ -294,13 +344,11 @@ export function WalletProvider({ children }: WalletProviderProps) {
         setPendingTransactionResolve(null);
         setPendingTransactionReject(null);
       }
-    }
-
-    // Clean up URL if there are any params
-    if (txSuccess || txError || accountId) {
-      // Clean URL immediately to prevent re-processing
+      
+      // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+
 
     // Listen for messages from wallet window
     const handleMessage = (event: MessageEvent) => {
@@ -348,6 +396,20 @@ export function WalletProvider({ children }: WalletProviderProps) {
         }
       } else if (event.data.type === 'WALLET_TRANSACTION_SUCCESS') {
         const { txHash } = event.data;
+        console.log('Received transaction success message from wallet tab:', txHash);
+        
+        // Check if this transaction was already processed
+        if (isTransactionProcessed(txHash)) {
+          console.log('Transaction already processed, skipping:', txHash);
+          return;
+        }
+        
+        // Mark as processed
+        addProcessedTransaction(txHash);
+        
+        // Get pending transaction info
+        const pendingTx = getPendingTransaction();
+        
         setIsProcessingTransaction(false);
         clearPendingTransaction();
         
@@ -360,7 +422,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
         
         // Dispatch custom event for ONS context to handle
         window.dispatchEvent(new CustomEvent('transactionSuccess', { 
-          detail: { txHash } 
+          detail: { txHash, pendingTransaction: pendingTx } 
         }));
         
         if (walletWindow) {
