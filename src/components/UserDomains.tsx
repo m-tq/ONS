@@ -37,14 +37,27 @@ export function UserDomains() {
   };
 
   const handleVerifyDomain = async (domain: ExtendedDomainRecord) => {
+    if (!wallet.address) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet to verify domain",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setVerifyingDomains(prev => new Set([...prev, domain.id]));
     try {
+      console.log('UserDomains: Verifying domain:', domain);
       await verifyDomainStatus(domain);
       toast({
         title: "Verification Complete",
         description: `Domain ${domain.domain}.oct has been verified`,
       });
+      // Refresh domains after verification
+      await refreshUserDomains();
     } catch (error) {
+      console.error('UserDomains: Verification error:', error);
       toast({
         title: "Verification Failed",
         description: "Failed to verify domain status",
@@ -160,14 +173,20 @@ export function UserDomains() {
               Domains registered to {truncateAddress(wallet.address!)}
             </CardDescription>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={refreshUserDomains}
-            disabled={isLoading}
-          >
-            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          </Button>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                console.log('UserDomains: Manual refresh triggered');
+                refreshUserDomains();
+              }}
+              disabled={isLoading}
+              title="Refresh domains list"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>

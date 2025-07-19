@@ -239,18 +239,27 @@ export function ONSProvider({ children }: ONSProviderProps) {
     if (!domain.tx_hash) return;
     
     try {
+      console.log('ONS Context: Verifying domain status for:', domain.domain);
       const tx = await octraRpc.getTransaction(domain.tx_hash);
       if (!tx) return;
       
+      console.log('ONS Context: Transaction details:', tx);
       let newStatus: DomainStatus = domain.status;
       
       if (domain.status === 'pending' && tx.status === 'confirmed') {
         // Verify the transaction is valid for registration
         if (tx.parsed_tx.message?.startsWith('register_domain:')) {
           const domainFromTx = tx.parsed_tx.message.replace('register_domain:', '').replace('.oct', '');
-          const isValid = await octraRpc.verifyDomainRegistration(domain.tx_hash, domainFromTx, domain.address);
-          if (isValid) {
+          console.log('ONS Context: Extracted domain from tx:', domainFromTx);
+          
+          // Check if domain matches and transaction is to master wallet
+          if (domainFromTx === domain.domain && 
+              tx.parsed_tx.to === octraRpc.getMasterWallet() &&
+              parseFloat(tx.parsed_tx.amount) >= 0.5) {
             newStatus = 'active';
+            console.log('ONS Context: Domain verified as active');
+          } else {
+            console.log('ONS Context: Domain verification failed');
           }
         }
       } else if (domain.status === 'deleting' && tx.status === 'confirmed') {
@@ -258,12 +267,14 @@ export function ONSProvider({ children }: ONSProviderProps) {
       }
       
       if (newStatus !== domain.status) {
+        console.log('ONS Context: Updating domain status from', domain.status, 'to', newStatus);
         await resolverApi.updateDomainStatus(domain.domain, newStatus);
-        await refreshUserDomains();
         
         window.dispatchEvent(new CustomEvent('domainStatusUpdated', { 
           detail: { domain: `${domain.domain}.oct`, status: newStatus } 
         }));
+      } else {
+        console.log('ONS Context: Domain status unchanged:', domain.status);
       }
     } catch (error) {
       console.error('Error verifying domain status:', error);
