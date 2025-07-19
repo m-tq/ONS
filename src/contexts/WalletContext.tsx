@@ -48,6 +48,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
   const [pendingTransactionResolve, setPendingTransactionResolve] = useState<((value: string | null) => void) | null>(null);
   const [pendingTransactionReject, setPendingTransactionReject] = useState<((reason?: any) => void) | null>(null);
   const [processedTransactions, setProcessedTransactions] = useState<Set<string>>(new Set());
+  const [connectionAttemptId, setConnectionAttemptId] = useState<string | null>(null);
 
   // Helper function to get wallet providers
   const getWalletProviders = () => {
@@ -112,6 +113,51 @@ export function WalletProvider({ children }: WalletProviderProps) {
 
   // Check for existing connection on load
   useEffect(() => {
+    // Listen for storage changes (cross-tab communication)
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'octra-dapp-wallet-connected' && event.newValue) {
+        try {
+          const connectionData = JSON.parse(event.newValue);
+          const currentAttemptId = localStorage.getItem('octra-dapp-connection-attempt');
+          
+          // Check if this connection is for our current attempt
+          if (connectionData.attemptId === currentAttemptId) {
+            console.log('Cross-tab wallet connection detected:', connectionData);
+            
+            setWallet({
+              isConnected: true,
+              address: connectionData.address,
+              publicKey: connectionData.publicKey,
+            });
+            
+            setSelectedProvider(connectionData.provider);
+            setIsConnecting(false);
+            
+            // Save wallet data
+            localStorage.setItem('octra-dapp-wallet', JSON.stringify({
+              address: connectionData.address,
+              publicKey: connectionData.publicKey,
+            }));
+            localStorage.setItem('octra-dapp-selected-provider', connectionData.provider);
+            
+            // Clean up connection attempt
+            localStorage.removeItem('octra-dapp-connection-attempt');
+            localStorage.removeItem('octra-dapp-wallet-connected');
+            
+            // Close wallet window if it exists
+            if (walletWindow && !walletWindow.closed) {
+              walletWindow.close();
+              setWalletWindow(null);
+            }
+          }
+        } catch (error) {
+          console.error('Error parsing cross-tab connection data:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
     // Restore processed transactions from localStorage
     try {
       const stored = localStorage.getItem('octra-dapp-processed-tx');
@@ -135,6 +181,31 @@ export function WalletProvider({ children }: WalletProviderProps) {
 
     // Handle wallet connection callback
     if (accountId && publicKey) {
+      // Check if this is a new tab connection (has connection attempt ID)
+      const connectionAttemptId = localStorage.getItem('octra-dapp-connection-attempt');
+      const savedProvider = localStorage.getItem('octra-dapp-selected-provider');
+      
+      if (connectionAttemptId) {
+        // This is a new tab connection, signal to original tab
+        const connectionData = {
+          attemptId: connectionAttemptId,
+          address: accountId,
+          publicKey: publicKey,
+          provider: savedProvider,
+          timestamp: Date.now()
+        };
+        
+        localStorage.setItem('octra-dapp-wallet-connected', JSON.stringify(connectionData));
+        
+        // Close this tab after a short delay
+        setTimeout(() => {
+          window.close();
+        }, 1000);
+        
+        return; // Don't process connection in this tab
+      }
+      
+      // This is the original tab, process normally
       const walletData = {
         address: accountId,
         publicKey: publicKey,
@@ -346,11 +417,17 @@ export function WalletProvider({ children }: WalletProviderProps) {
     
     // Cleanup function
     return () => {
+      window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('message', handleMessage);
     };
   }, []); // Empty dependency array to run only once on mount
 
   const connectWallet = (providerUrl?: string) => {
+    // Generate unique connection attempt ID
+    const attemptId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    setConnectionAttemptId(attemptId);
+    localStorage.setItem('octra-dapp-connection-attempt', attemptId);
+    
     setIsConnecting(true);
     
     // Use provided URL or get from providers list
@@ -386,7 +463,15 @@ export function WalletProvider({ children }: WalletProviderProps) {
       const checkClosed = setInterval(() => {
         if (walletWindow.closed) {
           clearInterval(checkClosed);
-          setIsConnecting(false);
+          // Don't immediately set connecting to false, wait for cross-tab signal
+          setTimeout(() => {
+            // Only set to false if no connection was established
+            const stillConnecting = localStorage.getItem('octra-dapp-connection-attempt');
+            if (stillConnecting === attemptId) {
+              setIsConnecting(false);
+              localStorage.removeItem('octra-dapp-connection-attempt');
+            }
+          }, 2000);
           setWalletWindow(null);
         }
       }, 1000);
@@ -501,8 +586,11 @@ export function WalletProvider({ children }: WalletProviderProps) {
       publicKey: null,
     });
     setSelectedProvider(null);
+    setConnectionAttemptId(null);
     localStorage.removeItem('octra-dapp-wallet');
     localStorage.removeItem('octra-dapp-selected-provider');
+    localStorage.removeItem('octra-dapp-connection-attempt');
+    localStorage.removeItem('octra-dapp-wallet-connected');
     clearPendingTransaction();
   };
 
