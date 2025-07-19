@@ -29,6 +29,7 @@ export function DomainRegistration() {
       
       // Check if this domain was already processed
       if (!processedDomains.has(registeredDomain)) {
+        console.log('DomainRegistration: Processing new domain registration:', registeredDomain);
         setProcessedDomains(prev => new Set([...prev, registeredDomain]));
         
         toast({
@@ -40,6 +41,8 @@ export function DomainRegistration() {
         setDomain('');
         setIsAvailable(null);
         setIsRegistering(false);
+      } else {
+        console.log('DomainRegistration: Domain already processed, skipping:', registeredDomain);
       }
     };
 
@@ -50,17 +53,23 @@ export function DomainRegistration() {
       // Only reset if we haven't processed this transaction yet
       if (txHash && !processedDomains.has(txHash)) {
         // Reset registration state when transaction succeeds
+        console.log('DomainRegistration: Resetting registration state for tx:', txHash);
         setIsRegistering(false);
+      } else {
+        console.log('DomainRegistration: Transaction already processed, not resetting state:', txHash);
       }
     };
+    
+    console.log('DomainRegistration: Adding event listeners');
     window.addEventListener('domainRegistered', handleDomainRegistered as EventListener);
     window.addEventListener('transactionSuccess', handleTransactionSuccess as EventListener);
     
     return () => {
+      console.log('DomainRegistration: Removing event listeners');
       window.removeEventListener('domainRegistered', handleDomainRegistered as EventListener);
       window.removeEventListener('transactionSuccess', handleTransactionSuccess as EventListener);
     };
-  }, [toast]);
+  }, [toast, processedDomains]);
 
   const handleCheckAvailability = async () => {
     if (!domain.trim()) {

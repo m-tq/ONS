@@ -42,38 +42,51 @@ export function ONSProvider({ children }: ONSProviderProps) {
   // Listen for transaction success events from WalletContext
   useEffect(() => {
     const handleTransactionSuccess = async (event: CustomEvent) => {
-      console.log('ONS Context received transaction success:', event.detail);
+      console.log('ONS Context: Received transaction success event:', event.detail);
       const { txHash, pendingTransaction } = event.detail;
       
-      if (txHash && !processingTransactions.has(txHash)) {
+      if (!txHash) {
+        console.log('ONS Context: No txHash in event, skipping');
+        return;
+      }
+      
+      if (processingTransactions.has(txHash)) {
+        console.log('ONS Context: Transaction already being processed:', txHash);
+        return;
+      }
+      
+      console.log('ONS Context: Starting to process transaction:', txHash);
+      
+      // Mark as processing to prevent duplicate processing
+      setProcessingTransactions(prev => new Set([...prev, txHash]));
+      
+      try {
+        await verifyAndProcessTransaction(txHash);
+        console.log('ONS Context: Transaction processed successfully:', txHash);
+      } catch (error) {
+        console.error('ONS Context: Error processing transaction:', error);
+      } finally {
         // Mark as processing to prevent duplicate processing
-        setProcessingTransactions(prev => new Set([...prev, txHash]));
-        
-        console.log('Processing transaction with pending info:', pendingTransaction);
-        try {
-          await verifyAndProcessTransaction(txHash);
-        } finally {
-          // Remove from processing set after completion
-          setProcessingTransactions(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(txHash);
-            return newSet;
-          });
-        }
-      } else if (txHash && processingTransactions.has(txHash)) {
-        console.log('ONS: Transaction already being processed:', txHash);
+        setProcessingTransactions(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(txHash);
+          return newSet;
+        });
       }
     };
 
+    console.log('ONS Context: Adding transaction success event listener');
     window.addEventListener('transactionSuccess', handleTransactionSuccess as EventListener);
     
     return () => {
+      console.log('ONS Context: Removing transaction success event listener');
       window.removeEventListener('transactionSuccess', handleTransactionSuccess as EventListener);
     };
-  }, [walletAddress]);
+  }, []);
 
   // Method to set wallet address from WalletContext
   const setWalletAddressFromContext = (address: string | null) => {
+    console.log('ONS Context: Setting wallet address:', address);
     setWalletAddress(address);
   };
 
@@ -168,33 +181,33 @@ export function ONSProvider({ children }: ONSProviderProps) {
   const verifyAndProcessTransaction = async (txHash: string) => {
     if (!walletAddress) return;
 
-    console.log('ONS: Verifying transaction:', txHash, 'for address:', walletAddress);
+    console.log('ONS Context: Verifying transaction:', txHash, 'for address:', walletAddress);
 
     try {
       // Get transaction details
       const tx = await octraRpc.getTransaction(txHash);
       if (!tx || tx.status !== 'confirmed') {
-        console.error('ONS: Transaction not found or not confirmed:', tx);
+        console.error('ONS Context: Transaction not found or not confirmed:', tx);
         return;
       }
 
-      console.log('ONS: Transaction details:', tx);
+      console.log('ONS Context: Transaction details:', tx);
 
       // Check if it's a domain registration transaction
       const message = tx.parsed_tx.message;
       if (message && message.startsWith('register_domain:') && message.endsWith('.oct')) {
         const domain = message.replace('register_domain:', '').replace('.oct', '');
         
-        console.log('ONS: Processing domain registration for:', domain);
+        console.log('ONS Context: Processing domain registration for:', domain);
         
         // Verify the transaction details
         const isValid = await octraRpc.verifyDomainRegistration(txHash, domain, walletAddress);
-        console.log('ONS: Transaction verification result:', isValid);
+        console.log('ONS Context: Transaction verification result:', isValid);
         
         if (isValid) {
           // Register in off-chain resolver
           const result = await resolverApi.registerDomain(domain, walletAddress, txHash);
-          console.log('ONS: Domain registration result:', result);
+          console.log('ONS Context: Domain registration result:', result);
           
           if (result) {
             // Refresh user domains and stats
@@ -207,18 +220,18 @@ export function ONSProvider({ children }: ONSProviderProps) {
               detail: { domain: `${domain}.oct`, txHash } 
             }));
             
-            console.log(`ONS: Domain ${domain}.oct registered successfully`);
+            console.log(`ONS Context: Domain ${domain}.oct registered successfully`);
           } else {
-            console.error('ONS: Failed to register domain in resolver API');
+            console.error('ONS Context: Failed to register domain in resolver API');
           }
         } else {
-          console.error('ONS: Transaction verification failed');
+          console.error('ONS Context: Transaction verification failed');
         }
       } else {
-        console.log('ONS: Not a domain registration transaction:', message);
+        console.log('ONS Context: Not a domain registration transaction:', message);
       }
     } catch (error) {
-      console.error('ONS: Error processing transaction:', error);
+      console.error('ONS Context: Error processing transaction:', error);
     }
   };
 
