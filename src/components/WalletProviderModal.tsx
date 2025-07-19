@@ -39,7 +39,7 @@ export function WalletProviderModal({ isOpen, onClose, onSelectProvider }: Walle
         url: fullUrl,
         description: isLocal 
           ? 'Development wallet running locally'
-          : 'Official Octra Web Wallet (opens in new tab)',
+          : 'Un-Official Octra Web Wallet',
         isLocal
       };
     });
