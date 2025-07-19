@@ -16,7 +16,6 @@ export function UserDomains() {
   const { toast } = useToast();
   const [verifyingDomains, setVerifyingDomains] = useState<Set<number>>(new Set());
   const [deletingDomains, setDeletingDomains] = useState<Set<number>>(new Set());
-  const [domainDeletionStatus, setDomainDeletionStatus] = useState<Map<number, 'idle' | 'deleting' | 'processing'>>(new Map());
 
   const getExplorerUrl = () => {
     return import.meta.env.VITE_EXPLORER_URL || 'https://octrascan.io';
@@ -79,7 +78,6 @@ export function UserDomains() {
   };
 
   const handleDeleteDomain = async (domain: ExtendedDomainRecord) => {
-    setDomainDeletionStatus(prev => new Map(prev.set(domain.id, 'deleting')));
     setDeletingDomains(prev => new Set([...prev, domain.id]));
     
     try {
@@ -91,22 +89,19 @@ export function UserDomains() {
       );
       
       if (txHash) {
-        setDomainDeletionStatus(prev => new Map(prev.set(domain.id, 'processing')));
         toast({
           title: "Deletion Initiated",
-          description: `Opening wallet to confirm domain deletion transaction.`,
+          description: `Domain deletion transaction sent. Please confirm in wallet.`,
         });
       } else {
         throw new Error('Failed to send deletion transaction');
       }
     } catch (error) {
-      setDomainDeletionStatus(prev => new Map(prev.set(domain.id, 'idle')));
       toast({
         title: "Deletion Failed",
         description: error instanceof Error ? error.message : "Failed to delete domain",
         variant: "destructive",
       });
-    } finally {
       setDeletingDomains(prev => {
         const newSet = new Set(prev);
         newSet.delete(domain.id);
@@ -255,20 +250,14 @@ export function UserDomains() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDeleteDomain(domain)}
-                          disabled={deletingDomains.has(domain.id) || domainDeletionStatus.get(domain.id) !== 'idle'}
+                          disabled={deletingDomains.has(domain.id)}
                           className="text-red-600 hover:text-red-700"
-                          title={domainDeletionStatus.get(domain.id) === 'processing' ? 
-                            'Please confirm deletion in wallet tab' : 'Delete domain'}
+                          title="Delete domain"
                         >
-                          {domainDeletionStatus.get(domain.id) === 'deleting' ? (
+                          {deletingDomains.has(domain.id) ? (
                             <>
                               <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
                               Deleting...
-                            </>
-                          ) : domainDeletionStatus.get(domain.id) === 'processing' ? (
-                            <>
-                              <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                              Processing...
                             </>
                           ) : (
                             <Trash2 className="h-4 w-4" />

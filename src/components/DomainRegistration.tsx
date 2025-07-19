@@ -289,16 +289,14 @@ export function DomainRegistration() {
 
                 <Button 
                   onClick={handleRegisterWithWallet}
-                  disabled={isProcessing || hasInsufficientBalance}
+                  disabled={isRegistering || hasInsufficientBalance}
                   className="w-full"
                   size="lg"
                 >
-                  {isProcessing ? (
+                  {isRegistering ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      {registrationStatus === 'registering' ? 'Registering Domain...' : 
-                       registrationStatus === 'processing' ? 'Processing Transaction...' : 
-                       'Preparing Registration...'}
+                      Registering Domain...
                     </>
                   ) : (
                     <>
@@ -309,10 +307,7 @@ export function DomainRegistration() {
                 </Button>
                 
                 <div className="text-xs text-muted-foreground text-center">
-                  {registrationStatus === 'processing' ? 
-                    'Please confirm the transaction in the wallet tab, then return here' :
-                    'Registration will be pending for 2-3 minutes while waiting for blockchain confirmation'
-                  }
+                  Registration will be pending for 2-3 minutes while waiting for blockchain confirmation
                 </div>
               </CardContent>
             </Card>
