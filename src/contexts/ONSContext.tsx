@@ -245,10 +245,13 @@ export function ONSProvider({ children }: ONSProviderProps) {
       let newStatus: DomainStatus = domain.status;
       
       if (domain.status === 'pending' && tx.status === 'confirmed') {
-        // Verify the transaction is valid
-        const isValid = await octraRpc.verifyDomainRegistration(domain.tx_hash, domain.domain, domain.address);
-        if (isValid) {
-          newStatus = 'active';
+        // Verify the transaction is valid for registration
+        if (tx.parsed_tx.message?.startsWith('register_domain:')) {
+          const domainFromTx = tx.parsed_tx.message.replace('register_domain:', '').replace('.oct', '');
+          const isValid = await octraRpc.verifyDomainRegistration(domain.tx_hash, domainFromTx, domain.address);
+          if (isValid) {
+            newStatus = 'active';
+          }
         }
       } else if (domain.status === 'deleting' && tx.status === 'confirmed') {
         newStatus = 'deleted';
@@ -398,115 +401,6 @@ export function ONSProvider({ children }: ONSProviderProps) {
         }
       } else {
         console.log('ONS Context: Not a domain-related transaction:', message);
-      }
-    } catch (error) {
-      console.error('ONS Context: Error processing transaction:', error);
-    }
-  };
-
-  const verifyDomainStatus = async (domain: ExtendedDomainRecord) => {
-    if (!domain.tx_hash) return;
-    
-    try {
-      const tx = await octraRpc.getTransaction(domain.tx_hash);
-      if (!tx) return;
-      
-      let newStatus: DomainStatus = domain.status;
-      
-      if (domain.status === 'pending' && tx.status === 'confirmed') {
-        // Verify the transaction is valid for registration
-        if (tx.parsed_tx.message?.startsWith('register_domain:')) {
-          const domainFromTx = tx.parsed_tx.message.replace('register_domain:', '').replace('.oct', '');
-          const isValid = await octraRpc.verifyDomainRegistration(domain.tx_hash, domainFromTx, domain.address);
-          if (isValid) {
-            newStatus = 'active';
-          }
-        }
-      } else if (domain.status === 'deleting' && tx.status === 'confirmed') {
-        newStatus = 'deleted';
-      }
-      
-      if (newStatus !== domain.status) {
-        await resolverApi.updateDomainStatus(domain.domain, newStatus);
-        await refreshUserDomains();
-        
-        window.dispatchEvent(new CustomEvent('domainStatusUpdated', { 
-          detail: { domain: `${domain.domain}.oct`, status: newStatus } 
-        }));
-      }
-    } catch (error) {
-      console.error('Error verifying domain status:', error);
-    }
-  };
-          // Register in off-chain resolver
-          const result = await resolverApi.registerDomain(domain, targetAddress, txHash);
-          console.log('ONS Context: Domain registration result:', result);
-          
-          if (result) {
-            // Refresh user domains and stats
-            await refreshUserDomains(targetAddress);
-            await refreshGlobalStats();
-            await refreshWalletBalance(targetAddress);
-            
-            // Show success notification
-            window.dispatchEvent(new CustomEvent('domainRegistered', { 
-              detail: { domain: `${domain}.oct`, txHash } 
-            }));
-            
-            console.log(`ONS Context: Domain ${domain}.oct registered successfully`);
-          } else {
-            console.error('ONS Context: Failed to register domain in resolver API');
-          }
-        } else {
-          console.error('ONS Context: Transaction verification failed');
-        }
-      } else if (message && message.startsWith('register_domain:') && message.endsWith('.oct') && tx.status === 'pending') {
-        // Handle pending registration
-        const domain = message.replace('register_domain:', '').replace('.oct', '');
-        console.log('ONS Context: Processing pending domain registration for:', domain);
-        
-        // Register as pending in database
-        const result = await resolverApi.registerDomain(domain, targetAddress, txHash, 'pending');
-        if (result) {
-          await refreshUserDomains(targetAddress);
-          await refreshGlobalStats();
-          await refreshWalletBalance(targetAddress);
-          
-          window.dispatchEvent(new CustomEvent('domainRegistered', { 
-            detail: { domain: `${domain}.oct`, txHash, status: 'pending' } 
-          }));
-          
-          console.log(`ONS Context: Domain ${domain}.oct registered as pending`);
-        }
-      } else if (message && message.startsWith('delete_domain:') && message.endsWith('.oct')) {
-        // Handle domain deletion
-        const domain = message.replace('delete_domain:', '').replace('.oct', '');
-        console.log('ONS Context: Processing domain deletion for:', domain);
-        
-        if (tx.status === 'confirmed') {
-          // Mark domain as deleted
-          const result = await resolverApi.updateDomainStatus(domain, 'deleted');
-          if (result) {
-            await refreshUserDomains(targetAddress);
-            await refreshGlobalStats();
-            
-            window.dispatchEvent(new CustomEvent('domainDeleted', { 
-              detail: { domain: `${domain}.oct`, txHash } 
-            }));
-          }
-        } else if (tx.status === 'pending') {
-          // Mark domain as deleting
-          const result = await resolverApi.updateDomainStatus(domain, 'deleting');
-          if (result) {
-            await refreshUserDomains(targetAddress);
-            
-            window.dispatchEvent(new CustomEvent('domainDeleting', { 
-              detail: { domain: `${domain}.oct`, txHash } 
-            }));
-          }
-        }
-      } else {
-        console.log('ONS Context: Not a domain registration transaction:', message);
       }
     } catch (error) {
       console.error('ONS Context: Error processing transaction:', error);
