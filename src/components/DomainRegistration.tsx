@@ -16,6 +16,7 @@ export function DomainRegistration() {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [processedDomains, setProcessedDomains] = useState<Set<string>>(new Set());
+  const [registrationStatus, setRegistrationStatus] = useState<'idle' | 'registering' | 'processing'>('idle');
   
   const { checkDomainAvailability, registerDomain, walletBalance } = useONS();
   const { wallet, sendTransaction, isProcessingTransaction } = useWallet();
@@ -48,6 +49,7 @@ export function DomainRegistration() {
         setDomain('');
         setIsAvailable(null);
         setIsRegistering(false);
+        setRegistrationStatus('idle');
       } else {
         console.log('DomainRegistration: Domain already processed, skipping:', registeredDomain);
       }
@@ -129,6 +131,7 @@ export function DomainRegistration() {
     }
 
     setIsRegistering(true);
+    setRegistrationStatus('registering');
     try {
       // Send transaction through wallet
       const txHash = await sendTransaction(
@@ -140,10 +143,10 @@ export function DomainRegistration() {
       if (txHash) {
         toast({
           title: "Transaction Sent!",
-          description: `Transaction sent successfully. You will be redirected to complete the registration.`,
+          description: `Opening wallet to confirm domain registration transaction.`,
         });
         
-        // Don't reset form here, wait for success callback
+        setRegistrationStatus('processing');
         console.log('Transaction sent, hash:', txHash);
       }
     } catch (error) {
@@ -154,13 +157,14 @@ export function DomainRegistration() {
         variant: "destructive",
       });
       setIsRegistering(false);
+      setRegistrationStatus('idle');
     } finally {
       // Don't set isRegistering to false here, wait for callback
     }
   };
 
   const hasInsufficientBalance = walletBalance && parseFloat(walletBalance.balance) < 0.5;
-  const isProcessing = isRegistering || isProcessingTransaction;
+  const isProcessing = registrationStatus !== 'idle' || isProcessingTransaction;
 
   return (
     <div className="space-y-6">
@@ -292,7 +296,9 @@ export function DomainRegistration() {
                   {isProcessing ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      {isProcessingTransaction ? 'Processing Transaction...' : 'Preparing Registration...'}
+                      {registrationStatus === 'registering' ? 'Registering Domain...' : 
+                       registrationStatus === 'processing' ? 'Processing Transaction...' : 
+                       'Preparing Registration...'}
                     </>
                   ) : (
                     <>
@@ -303,7 +309,10 @@ export function DomainRegistration() {
                 </Button>
                 
                 <div className="text-xs text-muted-foreground text-center">
-                  Registration will be pending for 2-3 minutes while waiting for blockchain confirmation
+                  {registrationStatus === 'processing' ? 
+                    'Please confirm the transaction in the wallet tab, then return here' :
+                    'Registration will be pending for 2-3 minutes while waiting for blockchain confirmation'
+                  }
                 </div>
               </CardContent>
             </Card>

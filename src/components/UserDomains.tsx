@@ -11,10 +11,12 @@ import type { ExtendedDomainRecord } from '../contexts/ONSContext';
 
 export function UserDomains() {
   const { wallet } = useWallet();
-  const { userDomains, isLoading, refreshUserDomains, verifyDomainStatus, deleteDomain } = useONS();
+  const { userDomains, isLoading, refreshUserDomains, verifyDomainStatus } = useONS();
+  const { sendTransaction } = useWallet();
   const { toast } = useToast();
   const [verifyingDomains, setVerifyingDomains] = useState<Set<number>>(new Set());
   const [deletingDomains, setDeletingDomains] = useState<Set<number>>(new Set());
+  const [domainDeletionStatus, setDomainDeletionStatus] = useState<Map<number, 'idle' | 'deleting' | 'processing'>>(new Map());
 
   const getExplorerUrl = () => {
     return import.meta.env.VITE_EXPLORER_URL || 'https://octrascan.io';
@@ -77,27 +79,28 @@ export function UserDomains() {
   };
 
   const handleDeleteDomain = async (domain: ExtendedDomainRecord) => {
-    if (domain.status !== 'active') {
-      toast({
-        title: "Cannot Delete",
-        description: "Only active domains can be deleted",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    setDomainDeletionStatus(prev => new Map(prev.set(domain.id, 'deleting')));
     setDeletingDomains(prev => new Set([...prev, domain.id]));
+    
     try {
-      const txHash = await deleteDomain(domain.domain);
+      // Send deletion transaction directly using wallet context
+      const txHash = await sendTransaction(
+        'oct8UYokvM1DR2QpTD4mncgvRzfM6f9yDuRR1gmBASgTk8d', // Master wallet
+        '0.1', // Deletion fee
+        `delete_domain:${domain.domain}.oct`
+      );
+      
       if (txHash) {
+        setDomainDeletionStatus(prev => new Map(prev.set(domain.id, 'processing')));
         toast({
           title: "Deletion Initiated",
-          description: `Domain deletion transaction sent. Please wait for confirmation.`,
+          description: `Opening wallet to confirm domain deletion transaction.`,
         });
       } else {
         throw new Error('Failed to send deletion transaction');
       }
     } catch (error) {
+      setDomainDeletionStatus(prev => new Map(prev.set(domain.id, 'idle')));
       toast({
         title: "Deletion Failed",
         description: error instanceof Error ? error.message : "Failed to delete domain",
@@ -252,11 +255,21 @@ export function UserDomains() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDeleteDomain(domain)}
-                          disabled={deletingDomains.has(domain.id)}
+                          disabled={deletingDomains.has(domain.id) || domainDeletionStatus.get(domain.id) !== 'idle'}
                           className="text-red-600 hover:text-red-700"
+                          title={domainDeletionStatus.get(domain.id) === 'processing' ? 
+                            'Please confirm deletion in wallet tab' : 'Delete domain'}
                         >
-                          {deletingDomains.has(domain.id) ? (
-                            <RefreshCw className="h-4 w-4 animate-spin" />
+                          {domainDeletionStatus.get(domain.id) === 'deleting' ? (
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                              Deleting...
+                            </>
+                          ) : domainDeletionStatus.get(domain.id) === 'processing' ? (
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                              Processing...
+                            </>
                           ) : (
                             <Trash2 className="h-4 w-4" />
                           )}
@@ -297,7 +310,7 @@ export function UserDomains() {
                     )}
                     {domain.status === 'deleting' && (
                       <div className="text-orange-600 dark:text-orange-400 text-xs">
-                        🗑️ Deletion pending confirmation (2-3 minutes)
+                        🗑️ Deletion pending confirmation (2-3 minutes) - Click "Check" to verify status
                       </div>
                     )}
                   </div>

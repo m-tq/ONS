@@ -23,7 +23,6 @@ interface ONSContextType {
   verifyAndProcessTransaction: (txHash: string) => Promise<void>;
   setWalletAddressFromContext: (address: string | null) => void;
   verifyDomainStatus: (domain: ExtendedDomainRecord) => Promise<void>;
-  deleteDomain: (domain: string) => Promise<string | null>;
   verifyDomainDeletion: (txHash: string) => Promise<void>;
 }
 
@@ -285,22 +284,13 @@ export function ONSProvider({ children }: ONSProviderProps) {
     if (!walletAddress) return null;
     
     try {
-      // This would need to be implemented in WalletContext
-      // For now, we'll return a mock transaction hash
-      const txHash = await new Promise<string>((resolve, reject) => {
-        // Dispatch event to WalletContext to send transaction
-        window.dispatchEvent(new CustomEvent('sendTransaction', {
-          detail: {
-            to: octraRpc.getMasterWallet(),
-            amount: '0.1', // Deletion fee
-            message: `delete_domain:${domain}.oct`,
-            resolve,
-            reject
-          }
-        }));
-      });
+      // Use wallet context to send deletion transaction
+      const { sendTransaction } = await import('../contexts/WalletContext');
       
-      return txHash;
+      // We need to get the sendTransaction function from the wallet context
+      // This will be handled by the component calling this function
+      throw new Error('deleteDomain should be called from component with wallet context');
+      
     } catch (error) {
       console.error('Error deleting domain:', error);
       return null;
@@ -455,7 +445,6 @@ export function ONSProvider({ children }: ONSProviderProps) {
       verifyAndProcessTransaction,
       setWalletAddressFromContext,
       verifyDomainStatus,
-      deleteDomain,
       verifyDomainDeletion
     }}>
       {children}
