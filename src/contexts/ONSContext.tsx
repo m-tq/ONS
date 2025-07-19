@@ -335,8 +335,9 @@ export function ONSProvider({ children }: ONSProviderProps) {
       // Get transaction details
       const tx = await octraRpc.getTransaction(txHash);
       if (!tx) {
-        console.error('ONS Context: Deletion transaction not found:', txHash);
-        return false;
+        console.log('ONS Context: Deletion transaction not found yet:', txHash);
+        // Transaction might still be pending, don't treat as error
+        throw new Error('Transaction not found yet. Please wait and try again.');
       }
 
       console.log('ONS Context: Deletion transaction details:', tx);
@@ -345,17 +346,23 @@ export function ONSProvider({ children }: ONSProviderProps) {
       const expectedMessage = `delete_domain:${domain}.oct`;
       if (tx.parsed_tx.message !== expectedMessage) {
         console.error('ONS Context: Invalid deletion transaction message:', tx.parsed_tx.message, 'expected:', expectedMessage);
-        return false;
+        throw new Error('Invalid deletion transaction message');
       }
 
       // Verify transaction is to master wallet and from correct address
       if (tx.parsed_tx.to !== octraRpc.getMasterWallet() || tx.parsed_tx.from !== walletAddress) {
         console.error('ONS Context: Invalid deletion transaction details');
-        return false;
+        throw new Error('Invalid deletion transaction details');
+      }
+
+      // Check if transaction is confirmed
+      if (tx.status !== 'confirmed') {
+        console.log('ONS Context: Deletion transaction still pending confirmation');
+        throw new Error('Transaction is still pending confirmation. Please wait and try again.');
       }
 
       // Determine status based on transaction confirmation
-      const status = tx.status === 'confirmed' ? 'deleted' : 'deleting';
+      const status = 'deleted';
       console.log('ONS Context: Updating domain status to:', status);
 
       // Update domain status with deletion transaction hash
@@ -367,27 +374,20 @@ export function ONSProvider({ children }: ONSProviderProps) {
         await refreshGlobalStats();
         await refreshWalletBalance();
         
-        // Dispatch appropriate event
-        if (tx.status === 'confirmed') {
-          window.dispatchEvent(new CustomEvent('domainDeleted', { 
-            detail: { domain: `${domain}.oct`, txHash } 
-          }));
-          console.log(`ONS Context: Domain ${domain}.oct deleted successfully`);
-        } else {
-          window.dispatchEvent(new CustomEvent('domainDeleting', { 
-            detail: { domain: `${domain}.oct`, txHash } 
-          }));
-          console.log(`ONS Context: Domain ${domain}.oct deletion pending confirmation`);
-        }
+        // Dispatch deletion event
+        window.dispatchEvent(new CustomEvent('domainDeleted', { 
+          detail: { domain: `${domain}.oct`, txHash } 
+        }));
+        console.log(`ONS Context: Domain ${domain}.oct deleted successfully`);
         
         return true;
       } else {
         console.error('ONS Context: Failed to update domain status');
-        return false;
+        throw new Error('Failed to update domain status');
       }
     } catch (error) {
       console.error('ONS Context: Error verifying domain deletion:', error);
-      return false;
+      throw error;
     }
   };
 

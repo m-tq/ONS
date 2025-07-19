@@ -132,25 +132,18 @@ export function UserDomains() {
     setVerifyingDeletion(prev => new Set([...prev, domain.id]));
     try {
       console.log('UserDomains: Verifying deletion for domain:', domain.domain, 'with hash:', domain.tx_hash);
-      const success = await verifyDomainDeletion(domain.domain, domain.tx_hash);
+      await verifyDomainDeletion(domain.domain, domain.tx_hash);
       
-      if (success) {
-        toast({
-          title: "Deletion Verified",
-          description: `Domain ${domain.domain}.oct deletion has been verified`,
-        });
-      } else {
-        toast({
-          title: "Verification Failed",
-          description: "Failed to verify domain deletion. The transaction may still be pending.",
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Deletion Verified",
+        description: `Domain ${domain.domain}.oct has been successfully deleted`,
+      });
     } catch (error) {
       console.error('UserDomains: Deletion verification error:', error);
+      const errorMessage = error instanceof Error ? error.message : "An error occurred while verifying deletion";
       toast({
-        title: "Verification Error",
-        description: "An error occurred while verifying deletion",
+        title: "Verification Failed",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -277,13 +270,13 @@ export function UserDomains() {
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      {(domain.status === 'pending' || domain.status === 'deleting') && (
+                      {domain.status === 'pending' && (
                         <Button
-                          variant={domain.status === 'pending' ? 'default' : 'ghost'}
+                          variant="default"
                           size="sm"
                           onClick={() => handleVerifyDomain(domain)}
                           disabled={verifyingDomains.has(domain.id)}
-                          className={domain.status === 'pending' ? 'bg-yellow-500 hover:bg-yellow-600 text-white animate-pulse' : ''}
+                          className="bg-yellow-500 hover:bg-yellow-600 text-white animate-pulse"
                         >
                           {verifyingDomains.has(domain.id) ? (
                             <>

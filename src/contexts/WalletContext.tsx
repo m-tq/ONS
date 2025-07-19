@@ -640,26 +640,19 @@ export function WalletProvider({ children }: WalletProviderProps) {
           const checkClosed = setInterval(() => {
             if (transactionWindow.closed) {
               clearInterval(checkClosed);
-              // Don't automatically reject when window closes
-              // The transaction might still be processing on the blockchain
-              // Wait for actual transaction result or timeout
+              // Window closed normally, don't treat as error
+              // Transaction might still be processing
               setWalletWindow(null);
             }
           }, 1000);
           
-          // Set timeout to stop checking after 3 minutes
+          // Set timeout to stop checking after 5 minutes
           setTimeout(() => {
             clearInterval(checkClosed);
-            // Only reject if no transaction result received after timeout
-            if (pendingTransactionReject) {
-              console.log('Transaction timeout - no result received');
-              pendingTransactionReject(new Error('Transaction timeout'));
-              setPendingTransactionResolve(null);
-              setPendingTransactionReject(null);
-              setIsProcessingTransaction(false);
-              clearPendingTransaction();
-            }
-          }, 180000); // 3 minutes timeout
+            // Don't automatically reject on timeout for deletion transactions
+            // Let user verify manually
+            setIsProcessingTransaction(false);
+          }, 300000); // 5 minutes timeout
         }
       });
     } catch (error) {
