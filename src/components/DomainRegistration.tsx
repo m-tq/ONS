@@ -25,17 +25,24 @@ export function DomainRegistration() {
   useEffect(() => {
     const handleDomainRegistered = (event: CustomEvent) => {
       console.log('DomainRegistration: Domain registered event received:', event.detail);
-      const { domain: registeredDomain } = event.detail;
+      const { domain: registeredDomain, status } = event.detail;
       
       // Check if this domain was already processed
       if (!processedDomains.has(registeredDomain)) {
         console.log('DomainRegistration: Processing new domain registration:', registeredDomain);
         setProcessedDomains(prev => new Set([...prev, registeredDomain]));
         
-        toast({
-          title: "Registration Successful!",
-          description: `${registeredDomain} has been registered successfully`,
-        });
+        if (status === 'pending') {
+          toast({
+            title: "Registration Submitted!",
+            description: `${registeredDomain} registration is pending blockchain confirmation (2-3 minutes)`,
+          });
+        } else {
+          toast({
+            title: "Registration Successful!",
+            description: `${registeredDomain} has been registered successfully`,
+          });
+        }
         
         // Reset form
         setDomain('');
@@ -294,6 +301,10 @@ export function DomainRegistration() {
                     </>
                   )}
                 </Button>
+                
+                <div className="text-xs text-muted-foreground text-center">
+                  Registration will be pending for 2-3 minutes while waiting for blockchain confirmation
+                </div>
               </CardContent>
             </Card>
           )}

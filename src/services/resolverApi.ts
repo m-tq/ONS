@@ -5,6 +5,8 @@ export interface DomainRecord {
   tx_hash: string;
   created_at: string;
   verified: boolean;
+  status?: 'pending' | 'active' | 'deleting' | 'deleted';
+  last_verified?: string;
 }
 
 export interface DomainStats {
@@ -20,7 +22,7 @@ export class ResolverApiService {
     this.baseUrl = import.meta.env.VITE_RESOLVER_API_URL || 'http://localhost:3001/api';
   }
 
-  async registerDomain(domain: string, address: string, txHash: string): Promise<DomainRecord | null> {
+  async registerDomain(domain: string, address: string, txHash: string, status: string = 'active'): Promise<DomainRecord | null> {
     try {
       console.log('ResolverAPI: Registering domain:', { domain, address, txHash });
       const response = await fetch(`${this.baseUrl}/domains`, {
@@ -32,6 +34,7 @@ export class ResolverApiService {
           domain,
           address,
           tx_hash: txHash,
+          status,
         }),
       });
 
@@ -47,6 +50,23 @@ export class ResolverApiService {
     } catch (error) {
       console.error('ResolverAPI: Error registering domain:', error);
       return null;
+    }
+  }
+
+  async updateDomainStatus(domain: string, status: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/domains/${domain}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status }),
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('Error updating domain status:', error);
+      return false;
     }
   }
 

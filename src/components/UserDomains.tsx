@@ -1,16 +1,20 @@
 import React from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { useONS } from '../contexts/ONSContext';
 import { useWallet } from '../contexts/WalletContext';
-import { Globe, Copy, ExternalLink, CheckCircle, RefreshCw, User } from 'lucide-react';
+import { Globe, Copy, ExternalLink, CheckCircle, RefreshCw, User, Clock, Trash2, AlertTriangle } from 'lucide-react';
 import { truncateAddress } from '../lib/utils';
 import { useToast } from '../hooks/use-toast';
+import type { ExtendedDomainRecord } from '../contexts/ONSContext';
 
 export function UserDomains() {
   const { wallet } = useWallet();
-  const { userDomains, isLoading, refreshUserDomains } = useONS();
+  const { userDomains, isLoading, refreshUserDomains, verifyDomainStatus, deleteDomain } = useONS();
   const { toast } = useToast();
+  const [verifyingDomains, setVerifyingDomains] = useState<Set<number>>(new Set());
+  const [deletingDomains, setDeletingDomains] = useState<Set<number>>(new Set());
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -30,6 +34,95 @@ export function UserDomains() {
 
   const openTransaction = (txHash: string) => {
     window.open(`https://octra.network/tx/${txHash}`, '_blank');
+  };
+
+  const handleVerifyDomain = async (domain: ExtendedDomainRecord) => {
+    setVerifyingDomains(prev => new Set([...prev, domain.id]));
+    try {
+      await verifyDomainStatus(domain);
+      toast({
+        title: "Verification Complete",
+        description: `Domain ${domain.domain}.oct has been verified`,
+      });
+    } catch (error) {
+      toast({
+        title: "Verification Failed",
+        description: "Failed to verify domain status",
+        variant: "destructive",
+      });
+    } finally {
+      setVerifyingDomains(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(domain.id);
+        return newSet;
+      });
+    }
+  };
+
+  const handleDeleteDomain = async (domain: ExtendedDomainRecord) => {
+    if (domain.status !== 'active') {
+      toast({
+        title: "Cannot Delete",
+        description: "Only active domains can be deleted",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setDeletingDomains(prev => new Set([...prev, domain.id]));
+    try {
+      const txHash = await deleteDomain(domain.domain);
+      if (txHash) {
+        toast({
+          title: "Deletion Initiated",
+          description: `Domain deletion transaction sent. Please wait for confirmation.`,
+        });
+      } else {
+        throw new Error('Failed to send deletion transaction');
+      }
+    } catch (error) {
+      toast({
+        title: "Deletion Failed",
+        description: error instanceof Error ? error.message : "Failed to delete domain",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingDomains(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(domain.id);
+        return newSet;
+      });
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <CheckCircle className="h-3 w-3 text-green-500" />;
+      case 'pending':
+        return <Clock className="h-3 w-3 text-yellow-500" />;
+      case 'deleting':
+        return <AlertTriangle className="h-3 w-3 text-orange-500" />;
+      case 'deleted':
+        return <Trash2 className="h-3 w-3 text-red-500" />;
+      default:
+        return <CheckCircle className="h-3 w-3 text-green-500" />;
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'Active';
+      case 'pending':
+        return 'Pending Confirmation';
+      case 'deleting':
+        return 'Deletion Pending';
+      case 'deleted':
+        return 'Deleted';
+      default:
+        return 'Active';
+    }
   };
 
   if (!wallet.isConnected) {
@@ -102,16 +195,43 @@ export function UserDomains() {
                       <div>
                         <p className="font-medium">{domain.domain}.oct</p>
                         <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                          {domain.verified && (
-                            <CheckCircle className="h-3 w-3 text-green-500" />
-                          )}
+                          {getStatusIcon(domain.status || 'active')}
                           <span>
-                            {domain.verified ? 'Verified' : 'Pending'}
+                            {getStatusText(domain.status || 'active')}
                           </span>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
+                      {(domain.status === 'pending' || domain.status === 'deleting') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleVerifyDomain(domain)}
+                          disabled={verifyingDomains.has(domain.id)}
+                        >
+                          {verifyingDomains.has(domain.id) ? (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
+                      {domain.status === 'active' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteDomain(domain)}
+                          disabled={deletingDomains.has(domain.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          {deletingDomains.has(domain.id) ? (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -140,6 +260,16 @@ export function UserDomains() {
                       <span className="text-muted-foreground">Registered: </span>
                       <span>{new Date(domain.created_at).toLocaleDateString()}</span>
                     </div>
+                    {domain.status === 'pending' && (
+                      <div className="text-yellow-600 dark:text-yellow-400 text-xs">
+                        ⏳ Waiting for blockchain confirmation (2-3 minutes)
+                      </div>
+                    )}
+                    {domain.status === 'deleting' && (
+                      <div className="text-orange-600 dark:text-orange-400 text-xs">
+                        🗑️ Deletion pending confirmation (2-3 minutes)
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

@@ -23,7 +23,9 @@ db.serialize(() => {
       address TEXT NOT NULL,
       tx_hash TEXT UNIQUE NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      verified BOOLEAN DEFAULT FALSE
+      verified BOOLEAN DEFAULT FALSE,
+      status TEXT DEFAULT 'active',
+      last_verified DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 });
@@ -60,24 +62,28 @@ async function verifyTransaction(txHash, domain, fromAddress) {
 
 // Register a new domain
 app.post('/api/domains', async (req, res) => {
-  const { domain, address, tx_hash } = req.body;
+  const { domain, address, tx_hash, status = 'active' } = req.body;
 
   if (!domain || !address || !tx_hash) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
   try {
-    // Verify transaction on-chain
-    const isValid = await verifyTransaction(tx_hash, domain, address);
+    // For pending status, skip verification
+    let isValid = true;
+    if (status === 'active') {
+      // Verify transaction on-chain for active domains
+      isValid = await verifyTransaction(tx_hash, domain, address);
+    }
     
-    if (!isValid) {
+    if (!isValid && status === 'active') {
       return res.status(400).json({ error: 'Invalid transaction or insufficient payment' });
     }
 
     // Insert into database
     db.run(
-      'INSERT INTO domains (domain, address, tx_hash, verified) VALUES (?, ?, ?, ?)',
-      [domain, address, tx_hash, true],
+      'INSERT INTO domains (domain, address, tx_hash, verified, status) VALUES (?, ?, ?, ?, ?)',
+      [domain, address, tx_hash, status === 'active', status],
       function(err) {
         if (err) {
           if (err.code === 'SQLITE_CONSTRAINT') {
@@ -91,7 +97,8 @@ app.post('/api/domains', async (req, res) => {
           domain,
           address,
           tx_hash,
-          verified: true,
+          verified: status === 'active',
+          status,
           created_at: new Date().toISOString()
         });
       }
@@ -100,6 +107,30 @@ app.post('/api/domains', async (req, res) => {
     console.error('Registration error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+// Update domain status
+app.put('/api/domains/:domain/status', (req, res) => {
+  const { domain } = req.params;
+  const { status } = req.body;
+
+  if (!status) {
+    return res.status(400).json({ error: 'Status is required' });
+  }
+
+  db.run(
+    'UPDATE domains SET status = ?, verified = ?, last_verified = CURRENT_TIMESTAMP WHERE domain = ?',
+    [status, status === 'active', domain],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Domain not found' });
+      }
+      res.json({ success: true, updated: this.changes });
+    }
+  );
 });
 
 // Get domains by address

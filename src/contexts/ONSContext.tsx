@@ -2,8 +2,15 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { resolverApi, DomainRecord, DomainStats } from '../services/resolverApi';
 import { octraRpc, WalletBalance } from '../services/octraRpc';
 
+export type DomainStatus = 'pending' | 'active' | 'deleting' | 'deleted';
+
+export interface ExtendedDomainRecord extends DomainRecord {
+  status: DomainStatus;
+  last_verified?: string;
+}
+
 interface ONSContextType {
-  userDomains: DomainRecord[];
+  userDomains: ExtendedDomainRecord[];
   globalStats: DomainStats | null;
   walletBalance: WalletBalance | null;
   isLoading: boolean;
@@ -11,10 +18,13 @@ interface ONSContextType {
   refreshGlobalStats: () => Promise<void>;
   refreshWalletBalance: () => Promise<void>;
   registerDomain: (domain: string, txHash: string) => Promise<boolean>;
-  resolveDomain: (domain: string) => Promise<DomainRecord | null>;
+  resolveDomain: (domain: string) => Promise<ExtendedDomainRecord | null>;
   checkDomainAvailability: (domain: string) => Promise<boolean>;
   verifyAndProcessTransaction: (txHash: string) => Promise<void>;
   setWalletAddressFromContext: (address: string | null) => void;
+  verifyDomainStatus: (domain: ExtendedDomainRecord) => Promise<void>;
+  deleteDomain: (domain: string) => Promise<string | null>;
+  verifyDomainDeletion: (txHash: string) => Promise<void>;
 }
 
 const ONSContext = createContext<ONSContextType | undefined>(undefined);
@@ -32,7 +42,7 @@ interface ONSProviderProps {
 }
 
 export function ONSProvider({ children }: ONSProviderProps) {
-  const [userDomains, setUserDomains] = useState<DomainRecord[]>([]);
+  const [userDomains, setUserDomains] = useState<ExtendedDomainRecord[]>([]);
   const [globalStats, setGlobalStats] = useState<DomainStats | null>(null);
   const [walletBalance, setWalletBalance] = useState<WalletBalance | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -225,9 +235,78 @@ export function ONSProvider({ children }: ONSProviderProps) {
     }
   };
 
-  const resolveDomain = async (domain: string): Promise<DomainRecord | null> => {
+  const verifyDomainStatus = async (domain: ExtendedDomainRecord) => {
+    if (!domain.tx_hash) return;
+    
     try {
-      return await resolverApi.resolveDomain(domain);
+      const tx = await octraRpc.getTransaction(domain.tx_hash);
+      if (!tx) return;
+      
+      let newStatus: DomainStatus = domain.status;
+      
+      if (domain.status === 'pending' && tx.status === 'confirmed') {
+        // Verify the transaction is valid
+        const isValid = await octraRpc.verifyDomainRegistration(domain.tx_hash, domain.domain, domain.address);
+        if (isValid) {
+          newStatus = 'active';
+        }
+      } else if (domain.status === 'deleting' && tx.status === 'confirmed') {
+        newStatus = 'deleted';
+      }
+      
+      if (newStatus !== domain.status) {
+        await resolverApi.updateDomainStatus(domain.domain, newStatus);
+        await refreshUserDomains();
+        
+        window.dispatchEvent(new CustomEvent('domainStatusUpdated', { 
+          detail: { domain: `${domain.domain}.oct`, status: newStatus } 
+        }));
+      }
+    } catch (error) {
+      console.error('Error verifying domain status:', error);
+    }
+  };
+
+  const deleteDomain = async (domain: string): Promise<string | null> => {
+    if (!walletAddress) return null;
+    
+    try {
+      // This would need to be implemented in WalletContext
+      // For now, we'll return a mock transaction hash
+      const txHash = await new Promise<string>((resolve, reject) => {
+        // Dispatch event to WalletContext to send transaction
+        window.dispatchEvent(new CustomEvent('sendTransaction', {
+          detail: {
+            to: octraRpc.getMasterWallet(),
+            amount: '0.1', // Deletion fee
+            message: `delete_domain:${domain}.oct`,
+            resolve,
+            reject
+          }
+        }));
+      });
+      
+      return txHash;
+    } catch (error) {
+      console.error('Error deleting domain:', error);
+      return null;
+    }
+  };
+
+  const verifyDomainDeletion = async (txHash: string) => {
+    await verifyAndProcessTransaction(txHash);
+  };
+
+  const resolveDomain = async (domain: string): Promise<ExtendedDomainRecord | null> => {
+    try {
+      const result = await resolverApi.resolveDomain(domain);
+      if (result) {
+        return {
+          ...result,
+          status: (result as any).status || 'active'
+        };
+      }
+      return null;
     } catch (error) {
       console.error('Error resolving domain:', error);
       return null;
@@ -255,7 +334,7 @@ export function ONSProvider({ children }: ONSProviderProps) {
 
       // Check if it's a domain registration transaction
       const message = tx.parsed_tx.message;
-      if (message && message.startsWith('register_domain:') && message.endsWith('.oct')) {
+      if (message && message.startsWith('register_domain:') && message.endsWith('.oct') && tx.status === 'confirmed') {
         const domain = message.replace('register_domain:', '').replace('.oct', '');
         
         console.log('ONS Context: Processing domain registration for:', domain);
@@ -286,6 +365,51 @@ export function ONSProvider({ children }: ONSProviderProps) {
           }
         } else {
           console.error('ONS Context: Transaction verification failed');
+        }
+      } else if (message && message.startsWith('register_domain:') && message.endsWith('.oct') && tx.status === 'pending') {
+        // Handle pending registration
+        const domain = message.replace('register_domain:', '').replace('.oct', '');
+        console.log('ONS Context: Processing pending domain registration for:', domain);
+        
+        // Register as pending in database
+        const result = await resolverApi.registerDomain(domain, targetAddress, txHash, 'pending');
+        if (result) {
+          await refreshUserDomains(targetAddress);
+          await refreshGlobalStats();
+          await refreshWalletBalance(targetAddress);
+          
+          window.dispatchEvent(new CustomEvent('domainRegistered', { 
+            detail: { domain: `${domain}.oct`, txHash, status: 'pending' } 
+          }));
+          
+          console.log(`ONS Context: Domain ${domain}.oct registered as pending`);
+        }
+      } else if (message && message.startsWith('delete_domain:') && message.endsWith('.oct')) {
+        // Handle domain deletion
+        const domain = message.replace('delete_domain:', '').replace('.oct', '');
+        console.log('ONS Context: Processing domain deletion for:', domain);
+        
+        if (tx.status === 'confirmed') {
+          // Mark domain as deleted
+          const result = await resolverApi.updateDomainStatus(domain, 'deleted');
+          if (result) {
+            await refreshUserDomains(targetAddress);
+            await refreshGlobalStats();
+            
+            window.dispatchEvent(new CustomEvent('domainDeleted', { 
+              detail: { domain: `${domain}.oct`, txHash } 
+            }));
+          }
+        } else if (tx.status === 'pending') {
+          // Mark domain as deleting
+          const result = await resolverApi.updateDomainStatus(domain, 'deleting');
+          if (result) {
+            await refreshUserDomains(targetAddress);
+            
+            window.dispatchEvent(new CustomEvent('domainDeleting', { 
+              detail: { domain: `${domain}.oct`, txHash } 
+            }));
+          }
         }
       } else {
         console.log('ONS Context: Not a domain registration transaction:', message);
@@ -330,7 +454,10 @@ export function ONSProvider({ children }: ONSProviderProps) {
       resolveDomain,
       checkDomainAvailability,
       verifyAndProcessTransaction,
-      setWalletAddressFromContext
+      setWalletAddressFromContext,
+      verifyDomainStatus,
+      deleteDomain,
+      verifyDomainDeletion
     }}>
       {children}
     </ONSContext.Provider>
