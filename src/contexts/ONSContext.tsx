@@ -23,7 +23,7 @@ interface ONSContextType {
   verifyAndProcessTransaction: (txHash: string) => Promise<void>;
   setWalletAddressFromContext: (address: string | null) => void;
   verifyDomainStatus: (domain: ExtendedDomainRecord) => Promise<void>;
-  verifyDomainDeletion: (txHash: string) => Promise<void>;
+  verifyDomainDeletion: (domain: string, txHash: string) => Promise<boolean>;
 }
 
 const ONSContext = createContext<ONSContextType | undefined>(undefined);
@@ -328,8 +328,67 @@ export function ONSProvider({ children }: ONSProviderProps) {
     }
   };
 
-  const verifyDomainDeletion = async (txHash: string) => {
-    await verifyAndProcessTransaction(txHash);
+  const verifyDomainDeletion = async (domain: string, txHash: string): Promise<boolean> => {
+    try {
+      console.log('ONS Context: Verifying domain deletion:', domain, txHash);
+      
+      // Get transaction details
+      const tx = await octraRpc.getTransaction(txHash);
+      if (!tx) {
+        console.error('ONS Context: Deletion transaction not found:', txHash);
+        return false;
+      }
+
+      console.log('ONS Context: Deletion transaction details:', tx);
+
+      // Verify this is a deletion transaction for the correct domain
+      const expectedMessage = `delete_domain:${domain}.oct`;
+      if (tx.parsed_tx.message !== expectedMessage) {
+        console.error('ONS Context: Invalid deletion transaction message:', tx.parsed_tx.message, 'expected:', expectedMessage);
+        return false;
+      }
+
+      // Verify transaction is to master wallet and from correct address
+      if (tx.parsed_tx.to !== octraRpc.getMasterWallet() || tx.parsed_tx.from !== walletAddress) {
+        console.error('ONS Context: Invalid deletion transaction details');
+        return false;
+      }
+
+      // Determine status based on transaction confirmation
+      const status = tx.status === 'confirmed' ? 'deleted' : 'deleting';
+      console.log('ONS Context: Updating domain status to:', status);
+
+      // Update domain status with deletion transaction hash
+      const result = await resolverApi.updateDomainStatus(domain, status, txHash);
+      
+      if (result) {
+        // Refresh user domains and stats
+        await refreshUserDomains();
+        await refreshGlobalStats();
+        await refreshWalletBalance();
+        
+        // Dispatch appropriate event
+        if (tx.status === 'confirmed') {
+          window.dispatchEvent(new CustomEvent('domainDeleted', { 
+            detail: { domain: `${domain}.oct`, txHash } 
+          }));
+          console.log(`ONS Context: Domain ${domain}.oct deleted successfully`);
+        } else {
+          window.dispatchEvent(new CustomEvent('domainDeleting', { 
+            detail: { domain: `${domain}.oct`, txHash } 
+          }));
+          console.log(`ONS Context: Domain ${domain}.oct deletion pending confirmation`);
+        }
+        
+        return true;
+      } else {
+        console.error('ONS Context: Failed to update domain status');
+        return false;
+      }
+    } catch (error) {
+      console.error('ONS Context: Error verifying domain deletion:', error);
+      return false;
+    }
   };
 
   const resolveDomain = async (domain: string): Promise<ExtendedDomainRecord | null> => {
@@ -417,7 +476,7 @@ export function ONSProvider({ children }: ONSProviderProps) {
         console.log('ONS Context: Domain deletion status will be:', status);
         
         // Update domain status
-        const result = await resolverApi.updateDomainStatus(domain, status);
+        const result = await resolverApi.updateDomainStatus(domain, status, txHash);
         console.log('ONS Context: Domain status update result:', result);
         
         if (result) {

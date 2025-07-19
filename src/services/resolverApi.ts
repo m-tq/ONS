@@ -53,14 +53,19 @@ export class ResolverApiService {
     }
   }
 
-  async updateDomainStatus(domain: string, status: string): Promise<boolean> {
+  async updateDomainStatus(domain: string, status: string, deletionTxHash?: string): Promise<boolean> {
     try {
+      const body: any = { status };
+      if (deletionTxHash) {
+        body.deletion_tx_hash = deletionTxHash;
+      }
+
       const response = await fetch(`${this.baseUrl}/domains/${domain}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(body),
       });
 
       return response.ok;

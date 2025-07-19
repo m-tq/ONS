@@ -112,18 +112,28 @@ app.post('/api/domains', async (req, res) => {
 // Update domain status
 app.put('/api/domains/:domain/status', (req, res) => {
   const { domain } = req.params;
-  const { status } = req.body;
+  const { status, deletion_tx_hash } = req.body;
 
   if (!status) {
     return res.status(400).json({ error: 'Status is required' });
   }
 
   console.log(`Updating domain ${domain} status to: ${status}`);
+  if (deletion_tx_hash) {
+    console.log(`Updating domain ${domain} deletion hash to: ${deletion_tx_hash}`);
+  }
 
-  db.run(
-    'UPDATE domains SET status = ?, verified = ?, last_verified = CURRENT_TIMESTAMP WHERE domain = ?',
-    [status, status === 'active', domain],
-    function(err) {
+  // Build dynamic query based on whether we have deletion_tx_hash
+  let query, params;
+  if (deletion_tx_hash) {
+    query = 'UPDATE domains SET status = ?, verified = ?, last_verified = CURRENT_TIMESTAMP, tx_hash = ? WHERE domain = ?';
+    params = [status, status === 'active', deletion_tx_hash, domain];
+  } else {
+    query = 'UPDATE domains SET status = ?, verified = ?, last_verified = CURRENT_TIMESTAMP WHERE domain = ?';
+    params = [status, status === 'active', domain];
+  }
+
+  db.run(query, params, function(err) {
       if (err) {
         console.error('Database error updating domain status:', err);
         return res.status(500).json({ error: 'Database error' });
@@ -132,7 +142,7 @@ app.put('/api/domains/:domain/status', (req, res) => {
         console.log(`Domain ${domain} not found for status update`);
         return res.status(404).json({ error: 'Domain not found' });
       }
-      console.log(`Successfully updated domain ${domain} status to ${status}, changes: ${this.changes}`);
+      console.log(`Successfully updated domain ${domain} status to ${status}${deletion_tx_hash ? ` with deletion hash ${deletion_tx_hash}` : ''}, changes: ${this.changes}`);
       res.json({ success: true, updated: this.changes });
     }
   );
