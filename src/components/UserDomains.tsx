@@ -317,7 +317,7 @@ export function UserDomains() {
                           )}
                         </Button>
                       )}
-                      {(domain.status === 'deleting' || domain.status === 'deleted') && (
+                      {domain.status === 'deleting' && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -378,7 +378,7 @@ export function UserDomains() {
                     )}
                     {domain.status === 'deleted' && (
                       <div className="text-red-600 dark:text-red-400 text-xs">
-                        ❌ Domain has been deleted - Click "Verify Deletion" to update with latest transaction
+                        ❌ Domain has been deleted successfully
                       </div>
                     )}
                   </div>
