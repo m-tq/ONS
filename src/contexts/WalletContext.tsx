@@ -221,9 +221,9 @@ export function WalletProvider({ children }: WalletProviderProps) {
       localStorage.setItem('octra-dapp-wallet', JSON.stringify(walletData));
       
       // Try to determine which provider was used based on referrer or current URL
-      savedProvider = localStorage.getItem('octra-dapp-selected-provider');
-      if (savedProvider) {
-        setSelectedProvider(savedProvider);
+      const savedProviderFromStorage = localStorage.getItem('octra-dapp-selected-provider');
+      if (savedProviderFromStorage) {
+        setSelectedProvider(savedProviderFromStorage);
       }
       
       setIsConnecting(false);
