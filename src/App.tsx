@@ -33,12 +33,12 @@ function AppContent() {
 function App() {
   return (
     <ThemeProvider>
-      <WalletProvider>
-        <ONSProvider>
+      <ONSProvider>
+        <WalletProvider>
           <AppContent />
           <Toaster />
-        </ONSProvider>
-      </WalletProvider>
+        </WalletProvider>
+      </ONSProvider>
     </ThemeProvider>
   );
 }
