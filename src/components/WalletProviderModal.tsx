@@ -29,18 +29,20 @@ export function WalletProviderModal({ isOpen, onClose, onSelectProvider }: Walle
     const useHttps = import.meta.env.VITE_WALLET_USE_HTTPS === 'true';
     const providerUrls = providersEnv.split(',').map(url => url.trim());
     
-    return providerUrls.map(url => ({
+    return providerUrls.map(url => {
       const isLocal = url.includes('localhost') || url.includes('127.0.0.1');
       const protocol = isLocal && !useHttps ? 'http' : 'https';
       const fullUrl = url.startsWith('http') ? url : `${protocol}://${url}`;
+      
+      return {
         name: isLocal ? 'Local Development Wallet' : 'Octra Web Wallet',
         url: fullUrl,
         description: isLocal 
-      description: url.includes('localhost') 
+          ? 'Development wallet running locally'
           : 'Official Octra Web Wallet',
         isLocal
-        : 'Official Octra Web Wallet'
-    }));
+      };
+    });
   };
 
   const providers = getWalletProviders();
