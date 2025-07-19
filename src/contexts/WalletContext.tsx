@@ -208,6 +208,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
       } else {
         console.log('No pending transaction resolve found, but event dispatched for ONS context');
       }
+      }, 500);
     }
 
     // Handle transaction error
@@ -290,7 +291,6 @@ export function WalletProvider({ children }: WalletProviderProps) {
         window.dispatchEvent(new CustomEvent('transactionSuccess', { 
           detail: { txHash } 
         }));
-      }, 500);
         
         if (walletWindow) {
           walletWindow.close();
