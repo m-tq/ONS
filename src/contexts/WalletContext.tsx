@@ -38,6 +38,29 @@ export function WalletProvider({ children }: WalletProviderProps) {
   });
   const [isConnecting, setIsConnecting] = useState(false);
   const [walletWindow, setWalletWindow] = useState<Window | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+
+  // Helper function to get wallet providers
+  const getWalletProviders = () => {
+    const providersEnv = import.meta.env.VITE_WALLET_PROVIDERS || 'octra.xme.my.id,localhost:5173';
+    const useHttps = import.meta.env.VITE_WALLET_USE_HTTPS === 'true';
+    const providerUrls = providersEnv.split(',').map(url => url.trim());
+    
+    return providerUrls.map(url => {
+      const isLocal = url.includes('localhost') || url.includes('127.0.0.1');
+      const protocol = isLocal && !useHttps ? 'http' : 'https';
+      const fullUrl = url.startsWith('http') ? url : `${protocol}://${url}`;
+      
+      return {
+        name: isLocal ? 'Local Development Wallet' : 'Octra Web Wallet',
+        url: fullUrl,
+        description: isLocal 
+          ? 'Development wallet running locally'
+          : 'Official Octra Web Wallet',
+        isLocal
+      };
+    });
+  };
 
   // Check for existing connection on load
   useEffect(() => {
@@ -69,6 +92,22 @@ export function WalletProvider({ children }: WalletProviderProps) {
 
           localStorage.setItem('octra-dapp-wallet', JSON.stringify(walletData));
           setIsConnecting(false);
+          
+          // Save the provider that was used for connection
+          if (walletWindow) {
+            const providers = getWalletProviders();
+            const provider = providers.find(p => {
+              try {
+                return new URL(p.url).origin === event.origin;
+              } catch {
+                return false;
+              }
+            });
+            if (provider) {
+              setSelectedProvider(provider.url);
+              localStorage.setItem('octra-dapp-selected-provider', provider.url);
+            }
+          }
           
           // Close wallet window
           if (walletWindow) {
@@ -123,6 +162,13 @@ export function WalletProvider({ children }: WalletProviderProps) {
 
         // Save to localStorage
         localStorage.setItem('octra-dapp-wallet', JSON.stringify(walletData));
+        
+        // Try to determine which provider was used based on referrer or current URL
+        const savedProvider = localStorage.getItem('octra-dapp-selected-provider');
+        if (savedProvider) {
+          setSelectedProvider(savedProvider);
+        }
+        
         setIsConnecting(false);
       }
 
@@ -146,6 +192,12 @@ export function WalletProvider({ children }: WalletProviderProps) {
           address: walletData.address,
           publicKey: walletData.publicKey,
         });
+        
+        // Restore selected provider
+        const savedProvider = localStorage.getItem('octra-dapp-selected-provider');
+        if (savedProvider) {
+          setSelectedProvider(savedProvider);
+        }
       } catch (error) {
         console.error('Failed to parse saved wallet data:', error);
         localStorage.removeItem('octra-dapp-wallet');
@@ -169,10 +221,16 @@ export function WalletProvider({ children }: WalletProviderProps) {
   const connectWallet = (providerUrl?: string) => {
     setIsConnecting(true);
     
-    // Use provided URL or default from environment
-    const defaultProviders = import.meta.env.VITE_WALLET_PROVIDERS || 'localhost:5173';
-    const firstProvider = defaultProviders.split(',')[0].trim();
-    const walletUrl = providerUrl || (firstProvider.startsWith('http') ? firstProvider : `https://${firstProvider}`);
+    // Use provided URL or get from providers list
+    let walletUrl = providerUrl;
+    if (!walletUrl) {
+      const providers = getWalletProviders();
+      walletUrl = providers[0]?.url || 'https://octra.xme.my.id';
+    }
+    
+    // Save selected provider
+    setSelectedProvider(walletUrl);
+    localStorage.setItem('octra-dapp-selected-provider', walletUrl);
     
     // URL callback untuk DApp ini
     const currentUrl = window.location.origin + window.location.pathname;
@@ -197,10 +255,19 @@ export function WalletProvider({ children }: WalletProviderProps) {
     }
 
     try {
-      // Use default wallet provider
-      const defaultProviders = import.meta.env.VITE_WALLET_PROVIDERS || 'localhost:5173';
-      const firstProvider = defaultProviders.split(',')[0].trim();
-      const walletUrl = firstProvider.startsWith('http') ? firstProvider : `https://${firstProvider}`;
+      // Use the same provider that was used for connection
+      let walletUrl = selectedProvider;
+      if (!walletUrl) {
+        // Fallback to saved provider or first available
+        const savedProvider = localStorage.getItem('octra-dapp-selected-provider');
+        if (savedProvider) {
+          walletUrl = savedProvider;
+          setSelectedProvider(savedProvider);
+        } else {
+          const providers = getWalletProviders();
+          walletUrl = providers[0]?.url || 'https://octra.xme.my.id';
+        }
+      }
       
       // URL callback untuk DApp ini
       const currentUrl = window.location.origin + window.location.pathname;
@@ -272,7 +339,9 @@ export function WalletProvider({ children }: WalletProviderProps) {
       address: null,
       publicKey: null,
     });
+    setSelectedProvider(null);
     localStorage.removeItem('octra-dapp-wallet');
+    localStorage.removeItem('octra-dapp-selected-provider');
   };
 
   return (
