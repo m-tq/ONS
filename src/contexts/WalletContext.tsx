@@ -13,7 +13,6 @@ interface WalletContextType {
   disconnectWallet: () => void;
   isConnecting: boolean;
   sendTransaction: (to: string, amount: string, message?: string) => Promise<string | null>;
-  handleTransactionSuccess: (txHash: string) => Promise<void>;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -38,9 +37,70 @@ export function WalletProvider({ children }: WalletProviderProps) {
     publicKey: null,
   });
   const [isConnecting, setIsConnecting] = useState(false);
+  const [walletWindow, setWalletWindow] = useState<Window | null>(null);
 
   // Check for existing connection on load
   useEffect(() => {
+    // Listen for messages from wallet window
+    const handleMessage = (event: MessageEvent) => {
+      // Verify origin for security
+      const allowedOrigins = getWalletProviders().map(provider => {
+        try {
+          return new URL(provider.url).origin;
+        } catch {
+          return '';
+        }
+      }).filter(Boolean);
+
+      if (!allowedOrigins.includes(event.origin)) {
+        return;
+      }
+
+      if (event.data.type === 'WALLET_CONNECTION_SUCCESS') {
+        const { address, publicKey } = event.data;
+        if (address && publicKey) {
+          const walletData = { address, publicKey };
+          
+          setWallet({
+            isConnected: true,
+            address,
+            publicKey,
+          });
+
+          localStorage.setItem('octra-dapp-wallet', JSON.stringify(walletData));
+          setIsConnecting(false);
+          
+          // Close wallet window
+          if (walletWindow) {
+            walletWindow.close();
+            setWalletWindow(null);
+          }
+        }
+      } else if (event.data.type === 'WALLET_CONNECTION_REJECTED') {
+        setIsConnecting(false);
+        if (walletWindow) {
+          walletWindow.close();
+          setWalletWindow(null);
+        }
+      } else if (event.data.type === 'WALLET_TRANSACTION_SUCCESS') {
+        const { txHash } = event.data;
+        if (txHash && onsContext) {
+          onsContext.verifyAndProcessTransaction(txHash);
+        }
+        if (walletWindow) {
+          walletWindow.close();
+          setWalletWindow(null);
+        }
+      } else if (event.data.type === 'WALLET_TRANSACTION_REJECTED') {
+        if (walletWindow) {
+          walletWindow.close();
+          setWalletWindow(null);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
     const handleUrlParams = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const txSuccess = urlParams.get('tx_success');
@@ -222,7 +282,6 @@ export function WalletProvider({ children }: WalletProviderProps) {
       disconnectWallet,
       isConnecting,
       sendTransaction,
-      handleTransactionSuccess
     }}>
       {children}
     </WalletContext.Provider>

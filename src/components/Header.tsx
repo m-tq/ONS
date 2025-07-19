@@ -55,7 +55,7 @@ export function Header() {
 
   const openExplorer = () => {
     if (wallet.address) {
-      window.open(`https://octrascan.io/addr/${wallet.address}`, '_blank');
+      window.open(`https://octra.network/addr/${wallet.address}`, '_blank');
     }
   };
 

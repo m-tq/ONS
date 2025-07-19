@@ -14,6 +14,7 @@ interface WalletProvider {
   name: string;
   url: string;
   description: string;
+  isLocal: boolean;
 }
 
 interface WalletProviderModalProps {
@@ -25,13 +26,19 @@ interface WalletProviderModalProps {
 export function WalletProviderModal({ isOpen, onClose, onSelectProvider }: WalletProviderModalProps) {
   const getWalletProviders = (): WalletProvider[] => {
     const providersEnv = import.meta.env.VITE_WALLET_PROVIDERS || 'octra.xme.my.id,localhost:5173';
+    const useHttps = import.meta.env.VITE_WALLET_USE_HTTPS === 'true';
     const providerUrls = providersEnv.split(',').map(url => url.trim());
     
     return providerUrls.map(url => ({
-      name: url.includes('localhost') ? 'Local Wallet' : 'Octra Web Wallet',
-      url: url.startsWith('http') ? url : `https://${url}`,
+      const isLocal = url.includes('localhost') || url.includes('127.0.0.1');
+      const protocol = isLocal && !useHttps ? 'http' : 'https';
+      const fullUrl = url.startsWith('http') ? url : `${protocol}://${url}`;
+        name: isLocal ? 'Local Development Wallet' : 'Octra Web Wallet',
+        url: fullUrl,
+        description: isLocal 
       description: url.includes('localhost') 
-        ? 'Development wallet running locally'
+          : 'Official Octra Web Wallet',
+        isLocal
         : 'Official Octra Web Wallet'
     }));
   };
@@ -64,13 +71,16 @@ export function WalletProviderModal({ isOpen, onClose, onSelectProvider }: Walle
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-primary/10 rounded-full">
-                      <Wallet className="h-4 w-4 text-primary" />
+                    <div className={`p-2 rounded-full ${provider.isLocal ? 'bg-orange-100 dark:bg-orange-900/30' : 'bg-primary/10'}`}>
+                      <Wallet className={`h-4 w-4 ${provider.isLocal ? 'text-orange-600 dark:text-orange-400' : 'text-primary'}`} />
                     </div>
                     <div>
                       <p className="font-medium">{provider.name}</p>
                       <p className="text-sm text-muted-foreground">
                         {provider.description}
+                      </p>
+                      <p className="text-xs text-muted-foreground font-mono">
+                        {provider.url}
                       </p>
                     </div>
                   </div>
