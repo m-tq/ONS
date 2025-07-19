@@ -35,8 +35,20 @@ export class OctraRpcService {
   async getTransaction(txHash: string): Promise<OctraTransaction | null> {
     try {
       console.log('OctraRPC: Fetching transaction:', txHash);
-      const response = await fetch(`${this.baseUrl}/tx/${txHash}`);
+      // Try direct Octra network first, then fallback to proxy
+      let response;
+      try {
+        response = await fetch(`https://octra.network/tx/${txHash}`);
+      } catch (error) {
+        console.log('OctraRPC: Direct fetch failed, trying proxy:', error);
+        response = await fetch(`${this.baseUrl}/tx/${txHash}`);
+      }
+      
       if (!response.ok) {
+        if (response.status === 404) {
+          console.log('OctraRPC: Transaction not found (404)');
+          return null;
+        }
         console.error('OctraRPC: Transaction fetch failed:', response.status, response.statusText);
         throw new Error(`HTTP error! status: ${response.status}`);
       }

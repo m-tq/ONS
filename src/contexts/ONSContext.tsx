@@ -168,15 +168,29 @@ export function ONSProvider({ children }: ONSProviderProps) {
       const verifiedDomains = await Promise.all(
         dbDomains.map(async (domain) => {
           try {
-            const isValid = await octraRpc.verifyDomainRegistration(
-              domain.tx_hash, 
-              domain.domain, 
-              domain.address
-            );
-            return { ...domain, verified: isValid };
+            // Skip verification for very recent transactions (less than 2 minutes old)
+            const domainAge = Date.now() - new Date(domain.created_at).getTime();
+            if (domainAge < 120000) { // 2 minutes
+              console.log(`Domain ${domain.domain} is too recent for verification, keeping current status`);
+              return domain;
+            }
+            
+            // Only verify if transaction exists
+            const tx = await octraRpc.getTransaction(domain.tx_hash);
+            if (!tx) {
+              console.log(`Transaction ${domain.tx_hash} not found, keeping domain as pending`);
+              return { ...domain, verified: false, status: 'pending' };
+            }
+            
+            const isValid = tx.status === 'confirmed' && 
+                           tx.parsed_tx.to === octraRpc.getMasterWallet() &&
+                           parseFloat(tx.parsed_tx.amount) >= 0.5 &&
+                           tx.parsed_tx.message === `register_domain:${domain.domain}.oct`;
+            
+            return { ...domain, verified: isValid, status: isValid ? 'active' : 'pending' };
           } catch (error) {
             console.error(`Error verifying domain ${domain.domain}:`, error);
-            return { ...domain, verified: false };
+            return { ...domain, verified: false, status: 'pending' };
           }
         })
       );

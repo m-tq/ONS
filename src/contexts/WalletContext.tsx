@@ -569,7 +569,38 @@ export function WalletProvider({ children }: WalletProviderProps) {
         });
         
         // Redirect ke wallet untuk transaction
-        window.location.href = `${walletUrl}?${params.toString()}`;
+        // Open wallet in new tab for transaction confirmation
+        const transactionWindow = window.open(`${walletUrl}?${params.toString()}`, '_blank');
+        setWalletWindow(transactionWindow);
+        
+        // Monitor transaction window
+        if (transactionWindow) {
+          const checkClosed = setInterval(() => {
+            if (transactionWindow.closed) {
+              clearInterval(checkClosed);
+              // Check if transaction was completed or cancelled
+              setTimeout(() => {
+                // If no transaction result received, consider it cancelled
+                if (pendingTransactionReject) {
+                  pendingTransactionReject(new Error('Transaction window was closed'));
+                  setPendingTransactionResolve(null);
+                  setPendingTransactionReject(null);
+                  setIsProcessingTransaction(false);
+                  clearPendingTransaction();
+                }
+              }, 2000);
+              setWalletWindow(null);
+            }
+          }, 1000);
+          
+          // Set timeout to stop checking after 5 minutes
+          setTimeout(() => {
+            clearInterval(checkClosed);
+            if (!transactionWindow.closed) {
+              setIsProcessingTransaction(false);
+            }
+          }, 300000);
+        }
       });
     } catch (error) {
       console.error('Error sending transaction:', error);
