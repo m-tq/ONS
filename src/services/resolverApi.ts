@@ -107,8 +107,18 @@ export class ResolverApiService {
 
   async checkDomainAvailability(domain: string): Promise<boolean> {
     try {
-      const resolved = await this.resolveDomain(domain);
-      return resolved === null; // Available if not found
+      // Check if domain exists and is not deleted
+      const response = await fetch(`${this.baseUrl}/domains/resolve/${domain}`);
+      if (response.status === 404) {
+        return true; // Domain not found, available
+      }
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const resolved = await response.json();
+      // Domain is available if it doesn't exist or if it's deleted
+      return !resolved || resolved.status === 'deleted';
     } catch (error) {
       console.error('Error checking domain availability:', error);
       return false;

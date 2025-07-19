@@ -80,27 +80,64 @@ app.post('/api/domains', async (req, res) => {
       return res.status(400).json({ error: 'Invalid transaction or insufficient payment' });
     }
 
-    // Insert into database
-    db.run(
-      'INSERT INTO domains (domain, address, tx_hash, verified, status) VALUES (?, ?, ?, ?, ?)',
-      [domain, address, tx_hash, status === 'active', status],
-      function(err) {
+    // Check if domain already exists
+    db.get(
+      'SELECT * FROM domains WHERE domain = ?',
+      [domain],
+      (err, existingDomain) => {
         if (err) {
-          if (err.code === 'SQLITE_CONSTRAINT') {
-            return res.status(409).json({ error: 'Domain already registered' });
-          }
           return res.status(500).json({ error: 'Database error' });
         }
 
-        res.status(201).json({
-          id: this.lastID,
-          domain,
-          address,
-          tx_hash,
-          verified: status === 'active',
-          status,
-          created_at: new Date().toISOString()
-        });
+        if (existingDomain) {
+          // If domain exists and is deleted, allow re-registration by updating the record
+          if (existingDomain.status === 'deleted') {
+            console.log(`Re-registering deleted domain: ${domain}`);
+            db.run(
+              'UPDATE domains SET address = ?, tx_hash = ?, verified = ?, status = ?, created_at = CURRENT_TIMESTAMP, last_verified = CURRENT_TIMESTAMP WHERE domain = ?',
+              [address, tx_hash, status === 'active', status, domain],
+              function(err) {
+                if (err) {
+                  return res.status(500).json({ error: 'Database error' });
+                }
+
+                res.status(201).json({
+                  id: existingDomain.id,
+                  domain,
+                  address,
+                  tx_hash,
+                  verified: status === 'active',
+                  status,
+                  created_at: new Date().toISOString()
+                });
+              }
+            );
+          } else {
+            // Domain exists and is not deleted
+            return res.status(409).json({ error: 'Domain already registered' });
+          }
+        } else {
+          // Domain doesn't exist, create new record
+          db.run(
+            'INSERT INTO domains (domain, address, tx_hash, verified, status) VALUES (?, ?, ?, ?, ?)',
+            [domain, address, tx_hash, status === 'active', status],
+            function(err) {
+              if (err) {
+                return res.status(500).json({ error: 'Database error' });
+              }
+
+              res.status(201).json({
+                id: this.lastID,
+                domain,
+                address,
+                tx_hash,
+                verified: status === 'active',
+                status,
+                created_at: new Date().toISOString()
+              });
+            }
+          );
+        }
       }
     );
   } catch (error) {
@@ -173,7 +210,7 @@ app.get('/api/domains/resolve/:domain', (req, res) => {
   const { domain } = req.params;
 
   db.get(
-    'SELECT * FROM domains WHERE domain = ? AND verified = TRUE',
+    'SELECT * FROM domains WHERE domain = ? AND verified = TRUE AND status != "deleted"',
     [domain],
     (err, row) => {
       if (err) {
