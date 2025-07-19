@@ -235,6 +235,7 @@ export function ONSProvider({ children }: ONSProviderProps) {
   };
 
   const verifyAndProcessTransaction = async (txHash: string) => {
+  }
   const verifyAndProcessTransaction = async (txHash: string, addressToUse?: string) => {
     const targetAddress = addressToUse || walletAddress;
     if (!targetAddress) {
