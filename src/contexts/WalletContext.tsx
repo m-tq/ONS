@@ -378,7 +378,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
     });
 
     // Open wallet in new tab instead of redirect
-    const walletWindow = window.open(`${walletUrl}?${params.toString()}`, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
+    const walletWindow = window.open(`${walletUrl}?${params.toString()}`, '_blank');
     setWalletWindow(walletWindow);
     
     // Monitor wallet window
