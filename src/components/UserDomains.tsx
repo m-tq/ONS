@@ -2,16 +2,6 @@ import React from 'react';
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from './ui/dialog';
 import { useONS } from '../contexts/ONSContext';
 import { useWallet } from '../contexts/WalletContext';
 import { Globe, Copy, ExternalLink, CheckCircle, RefreshCw, User, Clock, Trash2, AlertTriangle } from 'lucide-react';
@@ -27,9 +17,6 @@ export function UserDomains() {
   const [verifyingDomains, setVerifyingDomains] = useState<Set<number>>(new Set());
   const [deletingDomains, setDeletingDomains] = useState<Set<number>>(new Set());
   const [verifyingDeletion, setVerifyingDeletion] = useState<Set<number>>(new Set());
-  const [deletionTxHash, setDeletionTxHash] = useState('');
-  const [selectedDomainForVerification, setSelectedDomainForVerification] = useState<ExtendedDomainRecord | null>(null);
-  const [isVerifyDialogOpen, setIsVerifyDialogOpen] = useState(false);
 
   const getExplorerUrl = () => {
     return import.meta.env.VITE_EXPLORER_URL || 'https://octrascan.io';
@@ -132,11 +119,11 @@ export function UserDomains() {
     }
   };
 
-  const handleVerifyDeletion = async (domain: ExtendedDomainRecord, txHash: string) => {
-    if (!txHash.trim()) {
+  const handleVerifyDeletion = async (domain: ExtendedDomainRecord) => {
+    if (!domain.tx_hash) {
       toast({
-        title: "Invalid Transaction Hash",
-        description: "Please enter a valid transaction hash",
+        title: "No Transaction Hash",
+        description: "No deletion transaction hash found for this domain",
         variant: "destructive",
       });
       return;
@@ -144,21 +131,18 @@ export function UserDomains() {
 
     setVerifyingDeletion(prev => new Set([...prev, domain.id]));
     try {
-      console.log('UserDomains: Verifying deletion for domain:', domain.domain, 'with hash:', txHash);
-      const success = await verifyDomainDeletion(domain.domain, txHash);
+      console.log('UserDomains: Verifying deletion for domain:', domain.domain, 'with hash:', domain.tx_hash);
+      const success = await verifyDomainDeletion(domain.domain, domain.tx_hash);
       
       if (success) {
         toast({
           title: "Deletion Verified",
           description: `Domain ${domain.domain}.oct deletion has been verified`,
         });
-        setIsVerifyDialogOpen(false);
-        setDeletionTxHash('');
-        setSelectedDomainForVerification(null);
       } else {
         toast({
           title: "Verification Failed",
-          description: "Failed to verify domain deletion. Please check the transaction hash.",
+          description: "Failed to verify domain deletion. The transaction may still be pending.",
           variant: "destructive",
         });
       }
@@ -178,11 +162,6 @@ export function UserDomains() {
     }
   };
 
-  const openVerifyDeletionDialog = (domain: ExtendedDomainRecord) => {
-    setSelectedDomainForVerification(domain);
-    setDeletionTxHash('');
-    setIsVerifyDialogOpen(true);
-  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -309,12 +288,12 @@ export function UserDomains() {
                           {verifyingDomains.has(domain.id) ? (
                             <>
                               <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                              {domain.status === 'pending' ? 'Verifying...' : 'Checking...'}
+                              Verifying...
                             </>
                           ) : (
                             <>
                               <CheckCircle className="h-4 w-4 mr-1" />
-                              {domain.status === 'pending' ? 'Verify' : 'Check'}
+                              Verify
                             </>
                           )}
                         </Button>
@@ -339,80 +318,25 @@ export function UserDomains() {
                         </Button>
                       )}
                       {(domain.status === 'deleting' || domain.status === 'deleted') && (
-                        <Dialog open={isVerifyDialogOpen && selectedDomainForVerification?.id === domain.id} onOpenChange={(open) => {
-                          if (!open) {
-                            setIsVerifyDialogOpen(false);
-                            setSelectedDomainForVerification(null);
-                            setDeletionTxHash('');
-                          }
-                        }}>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openVerifyDeletionDialog(domain)}
-                              disabled={verifyingDeletion.has(domain.id)}
-                              className="text-orange-600 hover:text-orange-700"
-                            >
-                              {verifyingDeletion.has(domain.id) ? (
-                                <>
-                                  <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                                  Verifying...
-                                </>
-                              ) : (
-                                <>
-                                  <CheckCircle className="h-4 w-4 mr-1" />
-                                  Verify Deletion
-                                </>
-                              )}
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Verify Domain Deletion</DialogTitle>
-                              <DialogDescription>
-                                Enter the transaction hash of the domain deletion to verify the status of {domain.domain}.oct
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div>
-                                <Label htmlFor="deletion-tx-hash">Deletion Transaction Hash</Label>
-                                <Input
-                                  id="deletion-tx-hash"
-                                  placeholder="Enter transaction hash..."
-                                  value={deletionTxHash}
-                                  onChange={(e) => setDeletionTxHash(e.target.value)}
-                                  className="mt-1"
-                                />
-                              </div>
-                              <div className="flex justify-end space-x-2">
-                                <Button
-                                  variant="outline"
-                                  onClick={() => {
-                                    setIsVerifyDialogOpen(false);
-                                    setSelectedDomainForVerification(null);
-                                    setDeletionTxHash('');
-                                  }}
-                                >
-                                  Cancel
-                                </Button>
-                                <Button
-                                  onClick={() => handleVerifyDeletion(domain, deletionTxHash)}
-                                  disabled={!deletionTxHash.trim() || verifyingDeletion.has(domain.id)}
-                                >
-                                  {verifyingDeletion.has(domain.id) ? (
-                                    <>
-                                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                                      Verifying...
-                                    </>
-                                  ) : (
-                                    'Verify Deletion'
-                                  )}
-                                </Button>
-                              </div>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleVerifyDeletion(domain)}
+                          disabled={verifyingDeletion.has(domain.id)}
+                          className="text-orange-600 hover:text-orange-700"
+                        >
+                          {verifyingDeletion.has(domain.id) ? (
+                            <>
+                              <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                              Verifying...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Verify Deletion
+                            </>
+                          )}
+                        </Button>
                       )}
                       <Button
                         variant="ghost"
