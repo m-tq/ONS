@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { resolverApi, DomainRecord, DomainStats } from '../services/resolverApi';
 import { octraRpc, WalletBalance } from '../services/octraRpc';
 
-export type DomainStatus = 'pending' | 'active' | 'deleting' | 'deleted';
+export type DomainStatus = 'pending' | 'active' | 'deleting' | 'deleted' | 'failed';
 
 export interface ExtendedDomainRecord extends DomainRecord {
   status: DomainStatus;
@@ -185,8 +185,10 @@ export function ONSProvider({ children }: ONSProviderProps) {
             // Only verify if transaction exists
             const tx = await octraRpc.getTransaction(domain.tx_hash);
             if (!tx) {
-              console.log(`Transaction ${domain.tx_hash} not found, keeping domain as pending`);
-              return { ...domain, verified: false, status: 'pending' };
+              console.log(`Transaction ${domain.tx_hash} not found, marking as failed`);
+              // Update status to failed in database
+              await resolverApi.updateDomainStatus(domain.domain, 'failed');
+              return { ...domain, verified: false, status: 'failed' };
             }
             
             // Check if this is a registration or deletion transaction

@@ -5,6 +5,7 @@ import { Button } from './ui/button';
 import { useONS } from '../contexts/ONSContext';
 import { useWallet } from '../contexts/WalletContext';
 import { Globe, Copy, ExternalLink, CheckCircle, RefreshCw, User, Clock, Trash2, AlertTriangle } from 'lucide-react';
+import { XCircle } from 'lucide-react';
 import { truncateAddress } from '../lib/utils';
 import { useToast } from '../hooks/use-toast';
 import type { ExtendedDomainRecord } from '../contexts/ONSContext';
@@ -166,6 +167,8 @@ export function UserDomains() {
         return <AlertTriangle className="h-3 w-3 text-orange-500" />;
       case 'deleted':
         return <Trash2 className="h-3 w-3 text-red-500" />;
+      case 'failed':
+        return <XCircle className="h-3 w-3 text-red-500" />;
       default:
         return <CheckCircle className="h-3 w-3 text-green-500" />;
     }
@@ -181,6 +184,8 @@ export function UserDomains() {
         return 'Deletion Pending';
       case 'deleted':
         return 'Deleted';
+      case 'failed':
+        return 'Transaction Failed';
       default:
         return 'Active';
     }
@@ -372,6 +377,11 @@ export function UserDomains() {
                     {domain.status === 'deleted' && (
                       <div className="text-red-600 dark:text-red-400 text-xs">
                         ❌ Domain has been deleted successfully
+                      </div>
+                    )}
+                    {domain.status === 'failed' && (
+                      <div className="text-red-600 dark:text-red-400 text-xs">
+                        ❌ Transaction failed or not found on blockchain. You can try registering again.
                       </div>
                     )}
                   </div>

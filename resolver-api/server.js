@@ -128,6 +128,10 @@ app.put('/api/domains/:domain/status', (req, res) => {
   if (deletion_tx_hash) {
     query = 'UPDATE domains SET status = ?, verified = ?, last_verified = CURRENT_TIMESTAMP, tx_hash = ? WHERE domain = ?';
     params = [status, status === 'active', deletion_tx_hash, domain];
+  } else if (status === 'failed') {
+    // For failed status, clear the tx_hash
+    query = 'UPDATE domains SET status = ?, verified = ?, last_verified = CURRENT_TIMESTAMP, tx_hash = NULL WHERE domain = ?';
+    params = [status, false, domain];
   } else {
     query = 'UPDATE domains SET status = ?, verified = ?, last_verified = CURRENT_TIMESTAMP WHERE domain = ?';
     params = [status, status === 'active', domain];
