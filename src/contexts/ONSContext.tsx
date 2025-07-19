@@ -276,7 +276,7 @@ export function ONSProvider({ children }: ONSProviderProps) {
       if (!tx) return;
       
       console.log('ONS Context: Transaction details:', tx);
-      let newStatus: DomainStatus = domain.status;
+      let newStatus: DomainStatus = domain.status || 'pending';
       
       if (domain.status === 'pending' && tx.status === 'confirmed') {
         // Verify the transaction is valid for registration
