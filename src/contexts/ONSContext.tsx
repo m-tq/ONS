@@ -55,23 +55,56 @@ export function ONSProvider({ children }: ONSProviderProps) {
         return;
       }
       
+      // Get wallet address from pending transaction if current wallet address is null
+      let addressToUse = walletAddress;
+      if (!addressToUse && pendingTransaction) {
+        // Extract address from the transaction context or use a different approach
+        console.log('ONS Context: Wallet address is null, checking for address in other ways');
+        
+        // Try to get address from localStorage as fallback
+        try {
+          const savedWallet = localStorage.getItem('octra-dapp-wallet');
+          if (savedWallet) {
+            const walletData = JSON.parse(savedWallet);
+            addressToUse = walletData.address;
+            console.log('ONS Context: Using address from localStorage:', addressToUse);
+          }
+        } catch (error) {
+          console.error('ONS Context: Error getting address from localStorage:', error);
+        }
+      }
+      
+      if (!addressToUse) {
+        console.log('ONS Context: No wallet address available, will retry when address is set');
+        // Store the transaction hash to process later when wallet address becomes available
+        localStorage.setItem('ons-pending-tx-processing', JSON.stringify({
+          txHash,
+          pendingTransaction,
+          timestamp: Date.now()
+        }));
+        return;
+      }
+      
       console.log('ONS Context: Starting to process transaction:', txHash);
       
       // Mark as processing to prevent duplicate processing
       setProcessingTransactions(prev => new Set([...prev, txHash]));
       
       try {
-        await verifyAndProcessTransaction(txHash);
+        await verifyAndProcessTransaction(txHash, addressToUse);
         console.log('ONS Context: Transaction processed successfully:', txHash);
       } catch (error) {
         console.error('ONS Context: Error processing transaction:', error);
       } finally {
-        // Mark as processing to prevent duplicate processing
+        // Remove from processing set
         setProcessingTransactions(prev => {
           const newSet = new Set(prev);
           newSet.delete(txHash);
           return newSet;
         });
+        
+        // Clear any pending transaction processing
+        localStorage.removeItem('ons-pending-tx-processing');
       }
     };
 
@@ -82,12 +115,35 @@ export function ONSProvider({ children }: ONSProviderProps) {
       console.log('ONS Context: Removing transaction success event listener');
       window.removeEventListener('transactionSuccess', handleTransactionSuccess as EventListener);
     };
-  }, []);
+  }, [walletAddress, processingTransactions]);
 
   // Method to set wallet address from WalletContext
   const setWalletAddressFromContext = (address: string | null) => {
     console.log('ONS Context: Setting wallet address:', address);
     setWalletAddress(address);
+    
+    // Check if there's a pending transaction to process now that we have an address
+    if (address) {
+      const pendingProcessing = localStorage.getItem('ons-pending-tx-processing');
+      if (pendingProcessing) {
+        try {
+          const { txHash, pendingTransaction, timestamp } = JSON.parse(pendingProcessing);
+          // Only process if not too old (5 minutes)
+          if (Date.now() - timestamp < 300000) {
+            console.log('ONS Context: Processing pending transaction now that address is available:', txHash);
+            setTimeout(() => {
+              verifyAndProcessTransaction(txHash, address);
+            }, 1000); // Small delay to ensure everything is initialized
+          } else {
+            console.log('ONS Context: Pending transaction too old, skipping:', txHash);
+          }
+          localStorage.removeItem('ons-pending-tx-processing');
+        } catch (error) {
+          console.error('ONS Context: Error processing pending transaction:', error);
+          localStorage.removeItem('ons-pending-tx-processing');
+        }
+      }
+    }
   };
 
   const refreshUserDomains = async (address?: string) => {
@@ -179,9 +235,14 @@ export function ONSProvider({ children }: ONSProviderProps) {
   };
 
   const verifyAndProcessTransaction = async (txHash: string) => {
-    if (!walletAddress) return;
+  const verifyAndProcessTransaction = async (txHash: string, addressToUse?: string) => {
+    const targetAddress = addressToUse || walletAddress;
+    if (!targetAddress) {
+      console.error('ONS Context: No wallet address available for transaction processing');
+      return;
+    }
 
-    console.log('ONS Context: Verifying transaction:', txHash, 'for address:', walletAddress);
+    console.log('ONS Context: Verifying transaction:', txHash, 'for address:', targetAddress);
 
     try {
       // Get transaction details
@@ -201,19 +262,19 @@ export function ONSProvider({ children }: ONSProviderProps) {
         console.log('ONS Context: Processing domain registration for:', domain);
         
         // Verify the transaction details
-        const isValid = await octraRpc.verifyDomainRegistration(txHash, domain, walletAddress);
+        const isValid = await octraRpc.verifyDomainRegistration(txHash, domain, targetAddress);
         console.log('ONS Context: Transaction verification result:', isValid);
         
         if (isValid) {
           // Register in off-chain resolver
-          const result = await resolverApi.registerDomain(domain, walletAddress, txHash);
+          const result = await resolverApi.registerDomain(domain, targetAddress, txHash);
           console.log('ONS Context: Domain registration result:', result);
           
           if (result) {
             // Refresh user domains and stats
-            await refreshUserDomains();
+            await refreshUserDomains(targetAddress);
             await refreshGlobalStats();
-            await refreshWalletBalance();
+            await refreshWalletBalance(targetAddress);
             
             // Show success notification
             window.dispatchEvent(new CustomEvent('domainRegistered', { 

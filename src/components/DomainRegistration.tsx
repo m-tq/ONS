@@ -46,28 +46,12 @@ export function DomainRegistration() {
       }
     };
 
-    const handleTransactionSuccess = (event: CustomEvent) => {
-      console.log('DomainRegistration: Transaction success event received:', event.detail);
-      const { txHash } = event.detail;
-      
-      // Only reset if we haven't processed this transaction yet
-      if (txHash && !processedDomains.has(txHash)) {
-        // Reset registration state when transaction succeeds
-        console.log('DomainRegistration: Resetting registration state for tx:', txHash);
-        setIsRegistering(false);
-      } else {
-        console.log('DomainRegistration: Transaction already processed, not resetting state:', txHash);
-      }
-    };
-    
     console.log('DomainRegistration: Adding event listeners');
     window.addEventListener('domainRegistered', handleDomainRegistered as EventListener);
-    window.addEventListener('transactionSuccess', handleTransactionSuccess as EventListener);
     
     return () => {
       console.log('DomainRegistration: Removing event listeners');
       window.removeEventListener('domainRegistered', handleDomainRegistered as EventListener);
-      window.removeEventListener('transactionSuccess', handleTransactionSuccess as EventListener);
     };
   }, [toast, processedDomains]);
 

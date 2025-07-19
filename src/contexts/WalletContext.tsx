@@ -189,7 +189,9 @@ export function WalletProvider({ children }: WalletProviderProps) {
       localStorage.setItem('octra-dapp-processed-tx', JSON.stringify(recentTxs));
       setProcessedTransactions(new Set(recentTxs));
       
-      // Dispatch custom event for ONS context to handle
+      // Dispatch custom event for ONS context to handle with a small delay
+      // to ensure wallet address is properly set
+      setTimeout(() => {
       window.dispatchEvent(new CustomEvent('transactionSuccess', { 
         detail: { txHash, pendingTransaction: pendingTx } 
       }));
@@ -288,6 +290,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
         window.dispatchEvent(new CustomEvent('transactionSuccess', { 
           detail: { txHash } 
         }));
+      }, 500);
         
         if (walletWindow) {
           walletWindow.close();
