@@ -281,7 +281,7 @@ export function DomainRegistration() {
                   </div>
                   <div className="col-span-2">
                     <Label className="text-muted-foreground">Will be registered to</Label>
-                    <p className="font-mono text-xs bg-muted p-2 rounded mt-1">
+                    <p className="font-mono text-xs sm:text-sm bg-muted p-2 sm:p-3 rounded mt-1 break-all">
                       {wallet.address}
                     </p>
                   </div>
