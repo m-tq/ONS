@@ -37,15 +37,31 @@ export function ONSProvider({ children }: ONSProviderProps) {
   const [walletBalance, setWalletBalance] = useState<WalletBalance | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [processingTransactions, setProcessingTransactions] = useState<Set<string>>(new Set());
 
   // Listen for transaction success events from WalletContext
   useEffect(() => {
     const handleTransactionSuccess = async (event: CustomEvent) => {
       console.log('ONS Context received transaction success:', event.detail);
       const { txHash, pendingTransaction } = event.detail;
-      if (txHash) {
+      
+      if (txHash && !processingTransactions.has(txHash)) {
+        // Mark as processing to prevent duplicate processing
+        setProcessingTransactions(prev => new Set([...prev, txHash]));
+        
         console.log('Processing transaction with pending info:', pendingTransaction);
-        await verifyAndProcessTransaction(txHash);
+        try {
+          await verifyAndProcessTransaction(txHash);
+        } finally {
+          // Remove from processing set after completion
+          setProcessingTransactions(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(txHash);
+            return newSet;
+          });
+        }
+      } else if (txHash && processingTransactions.has(txHash)) {
+        console.log('ONS: Transaction already being processed:', txHash);
       }
     };
 

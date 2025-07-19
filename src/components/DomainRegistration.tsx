@@ -15,6 +15,7 @@ export function DomainRegistration() {
   const [isChecking, setIsChecking] = useState(false);
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [processedDomains, setProcessedDomains] = useState<Set<string>>(new Set());
   
   const { checkDomainAvailability, registerDomain, walletBalance } = useONS();
   const { wallet, sendTransaction, isProcessingTransaction } = useWallet();
@@ -25,21 +26,32 @@ export function DomainRegistration() {
     const handleDomainRegistered = (event: CustomEvent) => {
       console.log('DomainRegistration: Domain registered event received:', event.detail);
       const { domain: registeredDomain } = event.detail;
-      toast({
-        title: "Registration Successful!",
-        description: `${registeredDomain} has been registered successfully`,
-      });
       
-      // Reset form
-      setDomain('');
-      setIsAvailable(null);
-      setIsRegistering(false);
+      // Check if this domain was already processed
+      if (!processedDomains.has(registeredDomain)) {
+        setProcessedDomains(prev => new Set([...prev, registeredDomain]));
+        
+        toast({
+          title: "Registration Successful!",
+          description: `${registeredDomain} has been registered successfully`,
+        });
+        
+        // Reset form
+        setDomain('');
+        setIsAvailable(null);
+        setIsRegistering(false);
+      }
     };
 
     const handleTransactionSuccess = (event: CustomEvent) => {
       console.log('DomainRegistration: Transaction success event received:', event.detail);
-      // Reset registration state when transaction succeeds
-      setIsRegistering(false);
+      const { txHash } = event.detail;
+      
+      // Only reset if we haven't processed this transaction yet
+      if (txHash && !processedDomains.has(txHash)) {
+        // Reset registration state when transaction succeeds
+        setIsRegistering(false);
+      }
     };
     window.addEventListener('domainRegistered', handleDomainRegistered as EventListener);
     window.addEventListener('transactionSuccess', handleTransactionSuccess as EventListener);

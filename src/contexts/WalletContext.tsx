@@ -47,6 +47,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [pendingTransactionResolve, setPendingTransactionResolve] = useState<((value: string | null) => void) | null>(null);
   const [pendingTransactionReject, setPendingTransactionReject] = useState<((reason?: any) => void) | null>(null);
+  const [processedTransactions, setProcessedTransactions] = useState<Set<string>>(new Set());
 
   // Helper function to get wallet providers
   const getWalletProviders = () => {
@@ -94,8 +95,34 @@ export function WalletProvider({ children }: WalletProviderProps) {
   const clearPendingTransaction = () => {
     localStorage.removeItem('octra-dapp-pending-tx');
   };
+
+  const addProcessedTransaction = (txHash: string) => {
+    setProcessedTransactions(prev => new Set([...prev, txHash]));
+    // Store in localStorage to persist across page reloads
+    const processed = Array.from(processedTransactions);
+    processed.push(txHash);
+    // Keep only last 10 transactions to avoid memory issues
+    const recent = processed.slice(-10);
+    localStorage.setItem('octra-dapp-processed-tx', JSON.stringify(recent));
+  };
+
+  const isTransactionProcessed = (txHash: string): boolean => {
+    return processedTransactions.has(txHash);
+  };
+
   // Check for existing connection on load
   useEffect(() => {
+    // Restore processed transactions from localStorage
+    try {
+      const stored = localStorage.getItem('octra-dapp-processed-tx');
+      if (stored) {
+        const processed = JSON.parse(stored);
+        setProcessedTransactions(new Set(processed));
+      }
+    } catch (error) {
+      console.error('Error restoring processed transactions:', error);
+    }
+
     const handleUrlParams = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const txSuccess = urlParams.get('tx_success');
@@ -135,9 +162,18 @@ export function WalletProvider({ children }: WalletProviderProps) {
       if (txSuccess === 'true' && txHash) {
         console.log('Transaction success detected:', txHash);
         
+        // Check if this transaction was already processed
+        if (isTransactionProcessed(txHash)) {
+          console.log('Transaction already processed, skipping:', txHash);
+          return;
+        }
+        
         // Check if we have a pending transaction
         const pendingTx = getPendingTransaction();
         console.log('Pending transaction found:', pendingTx);
+        
+        // Mark transaction as processed
+        addProcessedTransaction(txHash);
         
         // Dispatch custom event for ONS context to handle
         window.dispatchEvent(new CustomEvent('transactionSuccess', { 
@@ -312,7 +348,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [pendingTransactionResolve, pendingTransactionReject, walletWindow]);
+  }, [pendingTransactionResolve, pendingTransactionReject, walletWindow, processedTransactions]);
 
   const connectWallet = (providerUrl?: string) => {
     setIsConnecting(true);
