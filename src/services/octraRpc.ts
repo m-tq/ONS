@@ -23,11 +23,13 @@ export interface WalletBalance {
 
 export class OctraRpcService {
   private baseUrl: string;
+  private proxyUrl: string;
   private masterWallet: string;
   private faucetUrl: string;
 
   constructor() {
-    this.baseUrl = import.meta.env.VITE_OCTRA_RPC_URL || 'http://localhost:5173/api/octra';
+    this.baseUrl = import.meta.env.VITE_OCTRA_RPC_URL || 'https://octra.network';
+    this.proxyUrl = '/api/octra'; // Always use proxy in browser
     this.masterWallet = import.meta.env.VITE_MASTER_WALLET || 'oct8UYokvM1DR2QpTD4mncgvRzfM6f9yDuRR1gmBASgTk8d';
     this.faucetUrl = import.meta.env.VITE_OCTRA_FAUCET_URL || 'https://oct-faucet.xme.my.id';
   }
@@ -35,14 +37,13 @@ export class OctraRpcService {
   async getTransaction(txHash: string): Promise<OctraTransaction | null> {
     try {
       console.log('OctraRPC: Fetching transaction:', txHash);
-      // Try direct Octra network first, then fallback to proxy
-      let response;
-      try {
-        response = await fetch(`https://octra.network/tx/${txHash}`);
-      } catch (error) {
-        console.log('OctraRPC: Direct fetch failed, trying proxy:', error);
-        response = await fetch(`${this.baseUrl}/tx/${txHash}`);
-      }
+      
+      // In production, always use proxy to avoid CORS issues
+      const isProduction = window.location.protocol === 'https:';
+      const url = isProduction ? `${this.proxyUrl}/tx/${txHash}` : `${this.baseUrl}/tx/${txHash}`;
+      
+      console.log('OctraRPC: Using URL:', url);
+      const response = await fetch(url);
       
       if (!response.ok) {
         if (response.status === 404) {
@@ -63,7 +64,12 @@ export class OctraRpcService {
 
   async getWalletBalance(address: string): Promise<WalletBalance | null> {
     try {
-      const response = await fetch(`${this.baseUrl}/balance/${address}`);
+      // Use proxy in production to avoid CORS
+      const isProduction = window.location.protocol === 'https:';
+      const url = isProduction ? `${this.proxyUrl}/balance/${address}` : `${this.baseUrl}/balance/${address}`;
+      
+      console.log('OctraRPC: Fetching balance from:', url);
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -76,7 +82,12 @@ export class OctraRpcService {
 
   async getWalletTransactions(address: string, limit = 50): Promise<OctraTransaction[]> {
     try {
-      const response = await fetch(`${this.baseUrl}/transactions/${address}?limit=${limit}`);
+      // Use proxy in production to avoid CORS
+      const isProduction = window.location.protocol === 'https:';
+      const url = isProduction ? `${this.proxyUrl}/transactions/${address}?limit=${limit}` : `${this.baseUrl}/transactions/${address}?limit=${limit}`;
+      
+      console.log('OctraRPC: Fetching transactions from:', url);
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
