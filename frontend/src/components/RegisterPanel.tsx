@@ -56,12 +56,11 @@ export function RegisterPanel({ config, wallet, initialLabel, onDone }: Props) {
   }, [config, years])
 
   const canSubmit = wallet.connection != null
-    && wallet.capability != null
     && config != null
     && phase.kind !== 'submitting'
 
   const handleSubmit = useCallback(async () => {
-    if (!wallet.sdk || !wallet.capability || !config) return
+    if (!wallet.sdk || !wallet.connection || !config) return
     setPhase({ kind: 'submitting' })
     try {
       const clean = normalizeLabel(label)
@@ -73,9 +72,16 @@ export function RegisterPanel({ config, wallet, initialLabel, onDone }: Props) {
       const pre = await loadName(clean)
       if (!pre.isAvailable) throw new Error('name is already taken')
 
+      // Acquire the write capability as part of the same user gesture that
+      // triggered the submit click — keeps Chrome's openPopup API inside its
+      // user-activation window so the wallet can show its approval popup
+      // inline rather than opening a standalone extension window.
+      const cap = await wallet.ensureCapability('write')
+      if (!cap) throw new Error('write permission not granted')
+
       const result = await sendWrite(
         wallet.sdk,
-        wallet.capability.id,
+        cap.id,
         'register_name',
         [clean, destination, viewPk, years],
         { amountOu: cost, ou: 1_000 },
@@ -195,11 +201,17 @@ export function RegisterPanel({ config, wallet, initialLabel, onDone }: Props) {
               />
               <ActionButton
                 type="button"
-                disabled={!wallet.sdk || !wallet.capability}
+                disabled={!wallet.sdk || !wallet.connection}
                 onClick={async () => {
-                  if (!wallet.sdk || !wallet.capability) return
+                  if (!wallet.sdk) return
                   try {
-                    const id = await wallet.sdk.getCryptoIdentity(wallet.capability.id)
+                    // Acquire the read cap inside the click handler so the
+                    // approval popup (if needed for the first call) lands
+                    // in the active user-gesture window.
+                    const cap = wallet.readCap ?? await wallet.ensureCapability('read')
+                    if (!cap) return
+                    // Auto-execute through the offscreen PVAC runner — no popup.
+                    const id = await wallet.sdk.getCryptoIdentity(cap.id)
                     if (id.viewPublicKey) setViewPk(id.viewPublicKey)
                   } catch (err) {
                     setPhase({ kind: 'error', message: (err as Error).message })

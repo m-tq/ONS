@@ -51,10 +51,16 @@ export function DashboardPanel({ wallet, config }: Props) {
   const followAction  = useAsyncAction()
 
   const refreshBalance = useCallback(async () => {
-    if (!wallet.sdk || !wallet.capability || !walletAddr) return
+    if (!wallet.sdk || !wallet.connection || !walletAddr) return
     try {
+      // Acquire the read cap if we don't have one yet — this button is a
+      // user-gesture entrypoint so the approval popup (shown only on the
+      // first call) lands inline.
+      const readCap = wallet.readCap ?? await wallet.ensureCapability('read')
+      if (!readCap) return
+
       const [sdkBalance, chainState] = await Promise.all([
-        wallet.sdk.getBalance(wallet.capability.id),
+        wallet.sdk.getBalance(readCap.id),
         getChainBalance(walletAddr).catch(() => null),
       ])
       setWalletBalance({
@@ -64,7 +70,7 @@ export function DashboardPanel({ wallet, config }: Props) {
     } catch (err) {
       console.warn('balance read failed', err)
     }
-  }, [wallet.sdk, wallet.capability, walletAddr])
+  }, [wallet, walletAddr])
 
   const refreshRows = useCallback(async () => {
     if (!walletAddr) return
@@ -114,11 +120,13 @@ export function DashboardPanel({ wallet, config }: Props) {
     params: unknown[],
     amountOu: bigint = 0n,
   ) => {
-    if (!wallet.sdk || !wallet.capability) return
+    if (!wallet.sdk || !wallet.connection) return
     setBusy(label + ':' + method)
     setNotice(null)
     try {
-      const result = await sendWrite(wallet.sdk, wallet.capability.id, method, params, { amountOu })
+      const cap = await wallet.ensureCapability('write')
+      if (!cap) throw new Error('write permission not granted')
+      const result = await sendWrite(wallet.sdk, cap.id, method, params, { amountOu })
       if (!result.success) throw new Error(result.revertReason ?? 'revert')
       setNotice({ kind: 'ok', text: `${method.replace(/_/g, ' ')} succeeded`, tx: result.txHash })
       await Promise.all([

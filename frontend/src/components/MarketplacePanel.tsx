@@ -38,7 +38,7 @@ export function MarketplacePanel({ wallet, config }: Props) {
   useEffect(() => { void refreshAction.run(doRefresh) }, [doRefresh]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleBuy = useCallback(async (entry: ListingEntry) => {
-    if (!wallet.sdk || !wallet.capability || !wallet.connection) {
+    if (!wallet.sdk || !wallet.connection) {
       setMessage({ kind: 'error', text: 'connect a wallet first' })
       return
     }
@@ -49,9 +49,14 @@ export function MarketplacePanel({ wallet, config }: Props) {
       const buyerAddr   = wallet.connection.address
       const buyerViewPk = wallet.identity?.viewPublicKey ?? wallet.connection.viewPublicKey ?? ''
 
+      // Acquire the write cap inside this click handler so the approval
+      // popup opens inline (not as a standalone extension window).
+      const cap = await wallet.ensureCapability('write')
+      if (!cap) throw new Error('write permission not granted')
+
       const result = await sendWrite(
         wallet.sdk,
-        wallet.capability.id,
+        cap.id,
         'buy_name',
         [entry.label, buyerAddr, buyerViewPk],
         { amountOu: price, ou: 1_000 },
